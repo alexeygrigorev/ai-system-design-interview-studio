@@ -85,6 +85,19 @@ function findShapeAt(shapes: DiagramShape[], point: Point) {
     .find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
 }
 
+function distanceToSegment(point: Point, start: Point, end: Point) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+  const projection = {
+    x: start.x + t * dx,
+    y: start.y + t * dy
+  };
+  return Math.hypot(point.x - projection.x, point.y - projection.y);
+}
+
 function displayLabel(label: string) {
   return label.length > 24 ? `${label.slice(0, 21)}...` : label;
 }
@@ -162,6 +175,16 @@ function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
   };
 }
 
+function findConnectorAt(shapes: DiagramShape[], point: Point) {
+  return [...shapes]
+    .reverse()
+    .find((shape) => {
+      if (shape.type !== "arrow") return false;
+      const endpoints = connectorEndpoints(shape, shapes);
+      return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
+    });
+}
+
 function connectionHandles(shape: DiagramShape) {
   const bounds = visualShapeBounds(shape);
   return [
@@ -178,6 +201,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; start: Point; current: Point } | null>(null);
+  const [reattachDrag, setReattachDrag] = useState<{ arrowId: string; endpoint: "source" | "target"; fixed: Point; current: Point } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
   const [indexChooser, setIndexChooser] = useState<{ x: number; y: number; shapeId: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -237,6 +261,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setShapes(nextShapes);
     if (selectedId && !nextShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
     if (connectorDrag && !nextShapes.some((shape) => shape.id === connectorDrag.sourceId)) setConnectorDrag(null);
+    if (reattachDrag && !nextShapes.some((shape) => shape.id === reattachDrag.arrowId)) setReattachDrag(null);
     setContextMenu(null);
   }
 
@@ -331,6 +356,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
     const point = toCanvasPoint(event);
     const hit = findShapeAt(shapes, point);
+    const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
 
     if (tool === "component") {
       event.stopPropagation();
@@ -345,7 +371,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       return;
     }
 
-    setSelectedId(hit?.id ?? null);
+    setSelectedId(hit?.id ?? connectorHit?.id ?? null);
     setDragStart(hit ? point : null);
     if (hit) {
       dragSnapshotRef.current = shapes;
@@ -355,6 +381,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   }
 
   function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (reattachDrag) {
+      setReattachDrag({ ...reattachDrag, current: toCanvasPoint(event) });
+      return;
+    }
     if (connectorDrag) {
       setConnectorDrag({ ...connectorDrag, current: toCanvasPoint(event) });
       return;
@@ -372,6 +402,30 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   }
 
   function onPointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    if (reattachDrag) {
+      const point = toCanvasPoint(event);
+      const target = findShapeAt(shapes, point);
+      if (target) {
+        commitShapes((currentShapes) => currentShapes.map((shape) => {
+          if (shape.id !== reattachDrag.arrowId || shape.type !== "arrow") return shape;
+          if (reattachDrag.endpoint === "source" && target.id === shape.targetId) return shape;
+          if (reattachDrag.endpoint === "target" && target.id === shape.sourceId) return shape;
+          const nextShape = reattachDrag.endpoint === "source"
+            ? { ...shape, sourceId: target.id }
+            : { ...shape, targetId: target.id };
+          const endpoints = connectorEndpoints(nextShape, currentShapes);
+          return {
+            ...nextShape,
+            x: endpoints.start.x,
+            y: endpoints.start.y,
+            width: endpoints.end.x - endpoints.start.x,
+            height: endpoints.end.y - endpoints.start.y
+          };
+        }));
+      }
+      setReattachDrag(null);
+      return;
+    }
     if (connectorDrag) {
       const point = toCanvasPoint(event);
       const target = findShapeAt(shapes, point);
@@ -425,6 +479,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     commitShapes(() => []);
     setSelectedId(null);
     setConnectorDrag(null);
+    setReattachDrag(null);
     setContextMenu(null);
     setIndexChooser(null);
     setTool("select");
@@ -463,9 +518,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     event.preventDefault();
     const point = toCanvasPoint(event);
     const hit = findShapeAt(shapes, point);
+    const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
     if (!hit) {
-      setSelectedId(null);
-      setContextMenu({ x: event.clientX, y: event.clientY, point });
+      setSelectedId(connectorHit?.id ?? null);
+      setContextMenu({ x: event.clientX, y: event.clientY, point, shapeId: connectorHit?.id });
       return;
     }
     setSelectedId(hit.id);
@@ -477,6 +533,19 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     event.stopPropagation();
     setSelectedId(sourceId);
     setConnectorDrag({ sourceId, start, current: start });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function startReattachDrag(event: React.PointerEvent<SVGCircleElement>, arrow: DiagramShape, endpoint: "source" | "target") {
+    event.stopPropagation();
+    const endpoints = connectorEndpoints(arrow, shapes);
+    setSelectedId(arrow.id);
+    setReattachDrag({
+      arrowId: arrow.id,
+      endpoint,
+      fixed: endpoint === "source" ? endpoints.end : endpoints.start,
+      current: endpoint === "source" ? endpoints.start : endpoints.end
+    });
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -621,6 +690,17 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             y1={connectorDrag.start.y}
             x2={connectorDrag.current.x}
             y2={connectorDrag.current.y}
+            stroke={handleColor}
+            strokeDasharray="10 8"
+            strokeWidth="5"
+          />
+        )}
+        {reattachDrag && (
+          <line
+            x1={reattachDrag.endpoint === "source" ? reattachDrag.current.x : reattachDrag.fixed.x}
+            y1={reattachDrag.endpoint === "source" ? reattachDrag.current.y : reattachDrag.fixed.y}
+            x2={reattachDrag.endpoint === "source" ? reattachDrag.fixed.x : reattachDrag.current.x}
+            y2={reattachDrag.endpoint === "source" ? reattachDrag.fixed.y : reattachDrag.current.y}
             stroke={handleColor}
             strokeDasharray="10 8"
             strokeWidth="5"
@@ -806,6 +886,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                     <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
                   </marker>
                 </defs>
+                <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
                 <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth={selected ? "4" : "2.5"} markerEnd={`url(#${markerId})`} />
               </g>
             );
@@ -825,6 +906,33 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             onPointerDown={(event) => startConnectorDrag(event, selectedShape.id, handle)}
           />
         ))}
+        {selectedShape && selectedShape.type === "arrow" && (() => {
+          const endpoints = connectorEndpoints(selectedShape, shapes);
+          return (
+            <>
+              <circle
+                className="connection-handle"
+                cx={endpoints.start.x}
+                cy={endpoints.start.y}
+                r="8"
+                fill={handleColor}
+                stroke="#ffffff"
+                strokeWidth="3"
+                onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
+              />
+              <circle
+                className="connection-handle"
+                cx={endpoints.end.x}
+                cy={endpoints.end.y}
+                r="8"
+                fill={handleColor}
+                stroke="#ffffff"
+                strokeWidth="3"
+                onPointerDown={(event) => startReattachDrag(event, selectedShape, "target")}
+              />
+            </>
+          );
+        })()}
       </svg>
       {editingShape && editorPosition && (
         <input
