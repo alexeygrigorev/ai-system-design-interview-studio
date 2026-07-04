@@ -331,6 +331,18 @@ function App() {
     }
   }, [screen, topic]);
 
+  useEffect(() => {
+    function onPointerDown(event: PointerEvent) {
+      const menu = sessionMenuRef.current;
+      const target = event.target;
+      if (!menu?.open || !(target instanceof Node) || menu.contains(target)) return;
+      closeSessionMenu();
+    }
+
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
   function updateTopic(nextTopic: string) {
     setTopic(nextTopic);
   }
@@ -573,6 +585,7 @@ function App() {
           setShapes={setShapes}
           sessionControls={(
             <>
+              <span className="timer-pill">{formatTimer(remainingSeconds)}</span>
               <details className="session-menu" ref={sessionMenuRef}>
                 <summary aria-label="Session actions">
                   <MoreVertical size={18} />
@@ -596,7 +609,6 @@ function App() {
                   </button>
                 </div>
               </details>
-              <span className="timer-pill">{formatTimer(remainingSeconds)}</span>
             </>
           )}
         />

@@ -866,7 +866,6 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             </button>
           ))}
         </div>
-        {sessionControls && <div className="canvas-session-controls">{sessionControls}</div>}
         <div className="tool-actions">
           <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
             <Minus size={18} />
@@ -887,6 +886,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             <Trash2 size={18} />
           </button>
         </div>
+        {sessionControls && <div className="canvas-session-controls">{sessionControls}</div>}
       </div>
 
       <svg
