@@ -193,18 +193,21 @@ button:disabled {
 
 .setup-load {
   background: transparent;
-  border: 1px solid transparent;
-  color: #667085;
-  font-size: 13px;
-  min-height: 34px;
-  padding: 7px 10px;
-  width: 100%;
+  border: 0;
+  color: #8a94a6;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  justify-self: center;
+  min-height: 0;
+  padding: 0;
+  width: auto;
 }
 
 .setup-load:hover {
-  background: #f8fafc;
-  border-color: #e0e6ef;
-  color: #374151;
+  background: transparent;
+  color: #526174;
+  text-decoration: underline;
 }
 
 .interview-shell {

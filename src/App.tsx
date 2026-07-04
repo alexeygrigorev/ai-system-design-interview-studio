@@ -1,4 +1,4 @@
-import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, Redo2, RotateCcw, Send, Trash2, Undo2, Upload, User } from "lucide-react";
+import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, Redo2, RotateCcw, Send, Trash2, Undo2, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -633,8 +633,7 @@ function App() {
             }}
             type="file"
           />
-          <button className="secondary-button setup-load" onClick={() => loadSessionInputRef.current?.click()} type="button">
-            <Upload size={16} />
+          <button className="setup-load" onClick={() => loadSessionInputRef.current?.click()} type="button">
             Load saved session
           </button>
         </section>
