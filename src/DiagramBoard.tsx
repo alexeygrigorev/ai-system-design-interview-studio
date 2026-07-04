@@ -382,7 +382,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         </div>
         <div className="component-toolbar" aria-label="Component types">
           {componentKinds.map(({ kind, label, icon: Icon }) => (
-            <button key={kind} className={componentKind === kind ? "component-chip active" : "component-chip"} onClick={() => { setComponentKind(kind); selectTool("component"); }} title={label} type="button">
+            <button key={kind} className={tool === "component" && componentKind === kind ? "component-chip active" : "component-chip"} onClick={() => { setComponentKind(kind); selectTool("component"); }} title={label} type="button">
               <Icon size={15} />
             </button>
           ))}
