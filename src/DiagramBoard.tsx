@@ -347,6 +347,7 @@ function findConnectorAt(shapes: DiagramShape[], point: Point) {
     .reverse()
     .find((shape) => {
       if (shape.type !== "arrow") return false;
+      if (shape.connectorKind === "note-link") return false;
       const endpoints = connectorEndpoints(shape, shapes);
       return distanceToSegment(point, endpoints.start, endpoints.end) <= 12;
     });
@@ -683,6 +684,12 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
   function deleteSelected() {
     if (!selectedId) return;
+    const selected = shapes.find((shape) => shape.id === selectedId);
+    if (selected?.connectorKind === "note-link") {
+      setSelectedId(null);
+      setContextMenu(null);
+      return;
+    }
     commitShapes((currentShapes) => currentShapes.filter((shape) => (
       shape.id !== selectedId && shape.sourceId !== selectedId && shape.targetId !== selectedId
     )));
@@ -1188,7 +1195,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   strokeWidth={isNoteLink ? "1.6" : "2"}
                   markerEnd={isNoteLink ? undefined : `url(#${markerId})`}
                 />
-                {showLabel && shape.label && (
+                {!isNoteLink && showLabel && shape.label && (
                   <text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle" dominantBaseline="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight} paintOrder="stroke" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="7">
                     <title>{shape.label}</title>
                     {labelText}
