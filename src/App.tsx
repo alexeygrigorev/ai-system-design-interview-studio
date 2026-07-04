@@ -1,5 +1,5 @@
 import { Bot, Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
 import { interviewProblems } from "./questionBank";
@@ -201,6 +201,7 @@ function App() {
   const [activeTopic, setActiveTopic] = useState(persistedState.activeTopic ?? interviewProblems[0].title);
   const [remainingSeconds, setRemainingSeconds] = useState(persistedState.remainingSeconds ?? duration * 60);
   const [cornerPanel, setCornerPanel] = useState<"hints" | "diagram" | null>(null);
+  const sessionMenuRef = useRef<HTMLDetailsElement | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
@@ -295,6 +296,10 @@ function App() {
     setTopic(nextTopic);
   }
 
+  function closeSessionMenu() {
+    sessionMenuRef.current?.removeAttribute("open");
+  }
+
   async function startInterview() {
     const randomProblem = interviewProblems[Math.floor(Math.random() * interviewProblems.length)];
     const selectedProblem = interviewProblems.find((problem) => problem.title === topic);
@@ -378,6 +383,7 @@ function App() {
   }
 
   function resetSession() {
+    closeSessionMenu();
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     setMessages([]);
     setAnswer("");
@@ -394,6 +400,7 @@ function App() {
 
   function restartCurrentProblem() {
     if (!activeBrief) return;
+    closeSessionMenu();
     setMessages([{ role: "assistant", content: openingTurn(activeBrief) }]);
     setAnswer("");
     setError("");
@@ -404,6 +411,7 @@ function App() {
   }
 
   function saveSessionSnapshot() {
+    closeSessionMenu();
     const snapshot = {
       savedAt: new Date().toISOString(),
       session,
@@ -420,6 +428,7 @@ function App() {
   }
 
   function saveDiagramSvg() {
+    closeSessionMenu();
     const svg = document.querySelector<SVGSVGElement>("svg.drawing-surface");
     if (!svg) {
       setError("Could not find the diagram SVG to save.");
@@ -523,7 +532,7 @@ function App() {
           setShapes={setShapes}
           sessionControls={(
             <>
-              <details className="session-menu">
+              <details className="session-menu" ref={sessionMenuRef}>
                 <summary aria-label="Session actions">
                   <MoreVertical size={18} />
                 </summary>
