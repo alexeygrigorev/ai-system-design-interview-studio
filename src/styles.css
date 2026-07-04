@@ -214,8 +214,10 @@ button:disabled {
   border-bottom: 1px solid #e3e7ef;
   gap: 12px;
   justify-content: space-between;
-  overflow-x: auto;
+  overflow: visible;
   padding: 10px;
+  position: relative;
+  z-index: 25;
 }
 
 .tool-strip,
@@ -425,7 +427,7 @@ button:disabled {
   position: absolute;
   right: 0;
   top: 40px;
-  z-index: 20;
+  z-index: 40;
 }
 
 .session-menu-content button {
