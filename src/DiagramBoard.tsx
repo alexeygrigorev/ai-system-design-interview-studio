@@ -27,7 +27,7 @@ interface DiagramBoardProps {
 const componentColor = "#2563eb";
 const noteColor = "#d97706";
 const connectorColor = componentColor;
-const selectedConnectorColor = "#111827";
+const selectedConnectorColor = "#1f2937";
 const handleColor = "#0f766e";
 const shapeLabelSize = 14;
 const shapeLabelWeight = 500;
@@ -893,7 +893,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   </marker>
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
-                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={selected ? selectedConnectorColor : connectorColor} strokeWidth={selected ? "6" : "2"} markerEnd={`url(#${markerId})`} />
+                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={selected ? selectedConnectorColor : connectorColor} strokeWidth={selected ? "4" : "2"} markerEnd={`url(#${markerId})`} />
               </g>
             );
           }
@@ -920,18 +920,18 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 className="connection-handle"
                 cx={endpoints.start.x}
                 cy={endpoints.start.y}
-                r="11"
+                r="9"
                 fill="#ffffff"
-                stroke={handleColor}
-                strokeWidth="4"
+                stroke={selectedConnectorColor}
+                strokeWidth="2.5"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
               />
               <circle
                 className="connection-handle"
                 cx={endpoints.start.x}
                 cy={endpoints.start.y}
-                r="4"
-                fill={handleColor}
+                r="3"
+                fill={selectedConnectorColor}
                 stroke="#ffffff"
                 strokeWidth="1"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
@@ -940,10 +940,20 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 className="connection-handle"
                 cx={endpoints.end.x}
                 cy={endpoints.end.y}
-                r="11"
-                fill={handleColor}
+                r="9"
+                fill="#ffffff"
+                stroke={selectedConnectorColor}
+                strokeWidth="2.5"
+                onPointerDown={(event) => startReattachDrag(event, selectedShape, "target")}
+              />
+              <circle
+                className="connection-handle"
+                cx={endpoints.end.x}
+                cy={endpoints.end.y}
+                r="3"
+                fill={selectedConnectorColor}
                 stroke="#ffffff"
-                strokeWidth="4"
+                strokeWidth="1"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "target")}
               />
             </>
