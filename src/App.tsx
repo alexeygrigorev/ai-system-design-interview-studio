@@ -1,4 +1,4 @@
-import { Bot, Download, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
+import { Bot, Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -98,6 +98,61 @@ function formatTimer(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function shapeName(shape: DiagramShape) {
+  return shape.label?.trim() || shape.primitive?.replace("-", " ") || shape.type;
+}
+
+function shapeKind(shape: DiagramShape) {
+  if (shape.primitive === "vector-index" && shape.indexKind) return `${shape.indexKind} index`;
+  return shape.primitive?.replace("-", " ") ?? shape.type;
+}
+
+function diagramTextSummary(shapes: DiagramShape[]) {
+  if (!shapes.length) return "No diagram components provided.";
+
+  const components = shapes.filter((shape) => shape.type === "rect" || shape.type === "ellipse");
+  const notes = shapes.filter((shape) => shape.type === "note");
+  const arrows = shapes.filter((shape) => shape.type === "arrow");
+  const byId = new Map(shapes.map((shape) => [shape.id, shape]));
+  const connectedIds = new Set<string>();
+
+  const componentLines = components.length
+    ? components.map((shape) => `- ${shapeName(shape)} (${shapeKind(shape)})`)
+    : ["- None detected."];
+  const noteLines = notes.length
+    ? notes.map((shape) => `- ${shapeName(shape)}`)
+    : ["- None detected."];
+  const relationshipLines = arrows.length
+    ? arrows.map((arrow) => {
+      const source = arrow.sourceId ? byId.get(arrow.sourceId) : undefined;
+      const target = arrow.targetId ? byId.get(arrow.targetId) : undefined;
+      if (!source || !target) return "- Unconnected connector";
+      connectedIds.add(source.id);
+      connectedIds.add(target.id);
+      const label = arrow.label ? ` (${arrow.label})` : "";
+      return `- ${shapeName(source)} -> ${shapeName(target)}${label}`;
+    })
+    : ["- None detected."];
+  const unconnected = [...components, ...notes].filter((shape) => !connectedIds.has(shape.id));
+  const unconnectedLines = unconnected.length
+    ? unconnected.map((shape) => `- ${shapeName(shape)} (${shapeKind(shape)})`)
+    : ["- None detected."];
+
+  return [
+    "Components:",
+    ...componentLines,
+    "",
+    "Notes:",
+    ...noteLines,
+    "",
+    "Relationships inferred from arrows:",
+    ...relationshipLines,
+    "",
+    "Unconnected or non-relationship artifacts:",
+    ...unconnectedLines
+  ].join("\n");
+}
+
 function filenamePart(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "interview";
 }
@@ -145,7 +200,7 @@ function App() {
   const [activePersona, setActivePersona] = useState<Persona>(persistedState.activePersona ?? "neutral");
   const [activeTopic, setActiveTopic] = useState(persistedState.activeTopic ?? interviewProblems[0].title);
   const [remainingSeconds, setRemainingSeconds] = useState(persistedState.remainingSeconds ?? duration * 60);
-  const [cornerPanel, setCornerPanel] = useState<"hints" | null>(null);
+  const [cornerPanel, setCornerPanel] = useState<"hints" | "diagram" | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
@@ -156,6 +211,7 @@ function App() {
     constraints: activeConstraints,
     brief: activeBrief
   }), [activeBrief, activeConstraints, activePersona, activeTopic, duration, level]);
+  const diagramSummary = useMemo(() => diagramTextSummary(shapes), [shapes]);
 
   const providerReady = Boolean(health?.ok && health.ready);
   function missingProviderMessage() {
@@ -502,14 +558,29 @@ function App() {
               </ul>
             </div>
           )}
-          <button
-            className={cornerPanel === "hints" ? "corner-tool active" : "corner-tool"}
-            onClick={() => setCornerPanel((current) => (current === "hints" ? null : "hints"))}
-            type="button"
-          >
-            <Lightbulb size={15} />
-            Hints
-          </button>
+          {cornerPanel === "diagram" && (
+            <div className="corner-popover diagram-text-popover" role="dialog" aria-label="AI-visible diagram text">
+              <pre>{diagramSummary}</pre>
+            </div>
+          )}
+          <div className="corner-tool-row">
+            <button
+              className={cornerPanel === "hints" ? "corner-tool active" : "corner-tool"}
+              onClick={() => setCornerPanel((current) => (current === "hints" ? null : "hints"))}
+              type="button"
+            >
+              <Lightbulb size={15} />
+              Hints
+            </button>
+            <button
+              className={cornerPanel === "diagram" ? "corner-tool active" : "corner-tool"}
+              onClick={() => setCornerPanel((current) => (current === "diagram" ? null : "diagram"))}
+              type="button"
+            >
+              <FileText size={15} />
+              AI text
+            </button>
+          </div>
         </div>
       </section>
 

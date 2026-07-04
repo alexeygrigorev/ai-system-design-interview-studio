@@ -199,6 +199,11 @@ button:disabled {
   z-index: 15;
 }
 
+.corner-tool-row {
+  display: flex;
+  gap: 8px;
+}
+
 .corner-tool {
   align-items: center;
   background: rgba(255, 255, 255, 0.82);
@@ -241,6 +246,22 @@ button:disabled {
 
 .corner-popover li + li {
   margin-top: 4px;
+}
+
+.diagram-text-popover {
+  max-height: 280px;
+  max-width: min(520px, calc(100vw - 40px));
+  overflow: auto;
+  width: max-content;
+}
+
+.diagram-text-popover pre {
+  color: #263245;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .interview-panel {
