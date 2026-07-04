@@ -932,7 +932,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
                 <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth="2" markerEnd={`url(#${markerId})`} />
                 {shape.label && (
-                  <text x={midpoint.x} y={midpoint.y - 7} textAnchor="middle" fill="#1f2937" fontSize="12" fontWeight="500" paintOrder="stroke" stroke="#ffffff" strokeLinejoin="round" strokeWidth="5">
+                  <text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle" dominantBaseline="middle" fill="#1f2937" fontSize="14" fontWeight="550" paintOrder="stroke" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="7">
                     <title>{shape.label}</title>
                     {labelText}
                   </text>
@@ -986,7 +986,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       {editingShape && editorPosition && (
         <input
           ref={editorRef}
-          className="label-editor"
+          className={editingShape.type === "arrow" ? "label-editor connector-label-editor" : "label-editor"}
           value={editingLabel}
           onChange={(event) => setEditingLabel(event.target.value)}
           onBlur={commitEditing}

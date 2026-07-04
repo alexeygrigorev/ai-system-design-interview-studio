@@ -318,14 +318,18 @@ button:disabled {
   border-radius: 6px;
   box-shadow: 0 10px 28px rgba(31, 41, 55, 0.14);
   color: #1f2937;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  padding: 8px 10px;
+  padding: 5px 8px;
   position: fixed;
   text-align: center;
   transform: translate(-50%, -50%);
-  width: min(220px, calc(100vw - 32px));
+  width: min(150px, calc(100vw - 32px));
   z-index: 12;
+}
+
+.connector-label-editor {
+  box-shadow: 0 6px 18px rgba(31, 41, 55, 0.12);
 }
 
 .panel-heading {
