@@ -36,14 +36,46 @@ const hiddenTechnicalRequirementPhrases = [
 ];
 
 const interviewHints = [
-  "Users and roles",
-  "Success criteria",
-  "Data sources",
-  "Scale and usage",
-  "Latency expectations",
-  "Safety and privacy",
-  "Access control",
-  "System requirements"
+  {
+    id: "users",
+    label: "Users and roles",
+    explanation: "Who uses the system, who is affected, and who approves or audits outputs?"
+  },
+  {
+    id: "success",
+    label: "Success criteria",
+    explanation: "What outcomes define a good answer, workflow, or launch?"
+  },
+  {
+    id: "data",
+    label: "Data sources",
+    explanation: "Which documents, events, databases, or third-party systems are involved?"
+  },
+  {
+    id: "scale",
+    label: "Scale and usage",
+    explanation: "How many users, requests, documents, tenants, or peak events should it handle?"
+  },
+  {
+    id: "latency",
+    label: "Latency expectations",
+    explanation: "Which paths are interactive, batch, async, or allowed to be slow?"
+  },
+  {
+    id: "safety",
+    label: "Safety and privacy",
+    explanation: "What private data, risky actions, abuse cases, or compliance duties matter?"
+  },
+  {
+    id: "access",
+    label: "Access control",
+    explanation: "Which permissions, groups, tenants, or source-system rules must be enforced?"
+  },
+  {
+    id: "requirements",
+    label: "System requirements",
+    explanation: "Which constraints are product-facing requirements versus implementation choices?"
+  }
 ];
 
 function candidateVisibleRequirements(constraints: string[]) {
@@ -201,6 +233,7 @@ function App() {
   const [activeTopic, setActiveTopic] = useState(persistedState.activeTopic ?? interviewProblems[0].title);
   const [remainingSeconds, setRemainingSeconds] = useState(persistedState.remainingSeconds ?? duration * 60);
   const [cornerPanel, setCornerPanel] = useState<"hints" | "diagram" | null>(null);
+  const [checkedHints, setCheckedHints] = useState<string[]>([]);
   const sessionMenuRef = useRef<HTMLDetailsElement | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
@@ -330,6 +363,7 @@ function App() {
     setMessages([{ role: "assistant", content: openingPlaceholder(resolvedTopic) }]);
     setShapes([]);
     setCornerPanel(null);
+    setCheckedHints([]);
     setRemainingSeconds(duration * 60);
     setScreen("interview");
 
@@ -390,6 +424,7 @@ function App() {
     setError("");
     setShapes([]);
     setCornerPanel(null);
+    setCheckedHints([]);
     setActiveConstraints([]);
     setActiveBrief(undefined);
     setTopic("__random__");
@@ -406,6 +441,7 @@ function App() {
     setError("");
     setShapes([]);
     setCornerPanel(null);
+    setCheckedHints([]);
     setRemainingSeconds(duration * 60);
     setScreen("interview");
   }
@@ -562,8 +598,29 @@ function App() {
         <div className="canvas-corner-tools">
           {cornerPanel === "hints" && (
             <div className="corner-popover" role="dialog" aria-label="Interview hints">
-              <ul>
-                {interviewHints.map((hint) => <li key={hint}>{hint}</li>)}
+              <ul className="hint-checklist">
+                {interviewHints.map((hint) => {
+                  const checked = checkedHints.includes(hint.id);
+                  return (
+                    <li key={hint.id} className={checked ? "hint-item checked" : "hint-item"}>
+                      <label>
+                        <input
+                          checked={checked}
+                          onChange={(event) => {
+                            setCheckedHints((current) => (
+                              event.target.checked
+                                ? [...current, hint.id]
+                                : current.filter((id) => id !== hint.id)
+                            ));
+                          }}
+                          type="checkbox"
+                        />
+                        <span>{hint.label}</span>
+                      </label>
+                      <div className="hint-explanation">{hint.explanation}</div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

@@ -239,13 +239,52 @@ button:disabled {
   padding: 10px 12px;
 }
 
-.corner-popover ul {
+.hint-checklist {
+  display: grid;
+  gap: 6px;
+  list-style: none;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
 }
 
-.corner-popover li + li {
-  margin-top: 4px;
+.hint-item {
+  display: grid;
+  gap: 3px;
+}
+
+.hint-item label {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 7px;
+}
+
+.hint-item input {
+  flex: 0 0 auto;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  width: 14px;
+}
+
+.hint-item.checked label span {
+  color: #667085;
+  text-decoration: line-through;
+}
+
+.hint-explanation {
+  color: #667085;
+  display: none;
+  font-size: 12px;
+  line-height: 1.35;
+  padding-left: 21px;
+}
+
+.hint-item:hover .hint-explanation,
+.hint-item:focus-within .hint-explanation {
+  display: block;
 }
 
 .diagram-text-popover {
