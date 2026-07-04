@@ -1,25 +1,19 @@
-import { AlertCircle, Bot, Loader2, Play, RotateCcw, Send, Sparkles, Wifi } from "lucide-react";
+import { Bot, Loader2, Play, RotateCcw, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getHealth, requestAssessment, requestInterviewTurn, type HealthStatus } from "./api";
+import { getHealth, requestInterviewTurn, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
 import { topicBank } from "./questionBank";
 import type { CandidateLevel, ChatMessage, DiagramShape, Persona, SessionConfig } from "./types";
 
-const defaultConstraints = [
-  "Must handle private data safely",
-  "Must define launch-blocking metrics",
-  "Must include production monitoring"
-];
-
 function App() {
   const [level, setLevel] = useState<CandidateLevel>("senior");
   const [duration, setDuration] = useState(45);
-  const [persona, setPersona] = useState<Persona | "random">("neutral");
-  const [topic, setTopic] = useState(topicBank[0]);
-  const [constraintText, setConstraintText] = useState(defaultConstraints.join("\n"));
+  const [persona, setPersona] = useState<Persona | "random">("random");
+  const [topic, setTopic] = useState("__random__");
+  const [customTopic, setCustomTopic] = useState("");
+  const [constraintText, setConstraintText] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answer, setAnswer] = useState("");
-  const [assessment, setAssessment] = useState("");
   const [shapes, setShapes] = useState<DiagramShape[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -41,28 +35,11 @@ function App() {
   }), [activePersona, activeTopic, constraintText, duration, level]);
 
   const providerReady = Boolean(health?.ok && health.ready);
-  const providerStatusClass = !health
-    ? "provider-status checking"
-    : providerReady
-      ? "provider-status ready"
-      : health.ok
-        ? "provider-status missing"
-        : "provider-status failure";
-  const providerStatusText = !health
-    ? "Checking Z.AI status"
-    : providerReady
-      ? `Z.AI ready: ${health.model}`
-      : health.ok
-        ? "Z.AI key missing"
-        : "Z.AI health check failed";
-
-  function missingProviderMessage(forAssessment = false) {
+  function missingProviderMessage() {
     if (!health) return "Still checking AI interviewer provider status. Try again in a moment.";
     if (!health.ok) return "The app health endpoint is unavailable. Check the dev server and reload the page.";
     if (!health.zaiConfigured) {
-      return forAssessment
-        ? "ZAI_API_KEY is not configured. Final assessment needs the Z.AI interviewer provider."
-        : "ZAI_API_KEY is not configured. Add it to .env and restart the dev server to use the AI interviewer.";
+      return "ZAI_API_KEY is not configured. Add it to .env and restart the dev server to use the AI interviewer.";
     }
     return "";
   }
@@ -96,8 +73,10 @@ function App() {
   async function startInterview() {
     const resolvedTopic = topic === "__random__"
       ? topicBank[Math.floor(Math.random() * topicBank.length)]
+      : topic === "__custom__"
+        ? customTopic.trim()
       : topic;
-    const personas: Persona[] = ["supportive", "neutral", "adversarial"];
+    const personas: Persona[] = ["neutral", "adversarial"];
     const resolvedPersona = persona === "random"
       ? personas[Math.floor(Math.random() * personas.length)]
       : persona;
@@ -106,9 +85,13 @@ function App() {
     setActivePersona(resolvedPersona);
     setBusy(true);
     setError("");
-    setAssessment("");
     setMessages([]);
     setShapes([]);
+    if (!resolvedTopic) {
+      setError("Enter a custom problem or choose one from the list.");
+      setBusy(false);
+      return;
+    }
     const providerError = missingProviderMessage();
     if (providerError) {
       setError(providerError);
@@ -155,41 +138,12 @@ function App() {
     }
   }
 
-  async function finishInterview() {
-    if (messages.length === 0 || busy) return;
-    const providerError = missingProviderMessage(true);
-    if (providerError) {
-      setError(providerError);
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const { assessment: finalAssessment } = await requestAssessment(session, messages, shapes);
-      setAssessment(finalAssessment);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not assess interview");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function resetSession() {
     setMessages([]);
     setAnswer("");
-    setAssessment("");
     setError("");
     setShapes([]);
     setScreen("setup");
-  }
-
-  function renderProviderStatus() {
-    return (
-      <div className={providerStatusClass}>
-        {providerReady ? <Wifi size={16} /> : health ? <AlertCircle size={16} /> : <Loader2 className="spin" size={16} />}
-        <span>{providerStatusText}</span>
-      </div>
-    );
   }
 
   if (screen === "setup") {
@@ -204,22 +158,33 @@ function App() {
             </div>
           </div>
 
-          {renderProviderStatus()}
           {error && <div className="error-box">{error}</div>}
 
           <label>
             Question
             <select value={topic} onChange={(event) => setTopic(event.target.value)}>
               <option value="__random__">Random question</option>
+              <option value="__custom__">Custom problem</option>
               {topicBank.map((item) => <option key={item}>{item}</option>)}
             </select>
           </label>
+
+          {topic === "__custom__" && (
+            <label>
+              Custom problem
+              <textarea
+                value={customTopic}
+                onChange={(event) => setCustomTopic(event.target.value)}
+                placeholder="Example: Internal support assistant that answers questions from private runbooks and escalates risky actions."
+                rows={3}
+              />
+            </label>
+          )}
 
           <label>
             Interviewer
             <select value={persona} onChange={(event) => setPersona(event.target.value as Persona | "random")}>
               <option value="random">Random interviewer</option>
-              <option value="supportive">Supportive coach</option>
               <option value="neutral">Neutral evaluator</option>
               <option value="adversarial">Adversarial challenger</option>
             </select>
@@ -247,8 +212,13 @@ function App() {
               </label>
             </div>
             <label>
-              Constraints
-              <textarea value={constraintText} onChange={(event) => setConstraintText(event.target.value)} rows={4} />
+              Problem-specific constraints
+              <textarea
+                value={constraintText}
+                onChange={(event) => setConstraintText(event.target.value)}
+                placeholder="Optional. Example: regulated domain, low latency, human approval for irreversible actions."
+                rows={4}
+              />
             </label>
           </details>
 
@@ -265,15 +235,13 @@ function App() {
     <main className="interview-shell">
       <header className="interview-header">
         <div>
-          <h1>AI System Design Interview</h1>
-          <p>{activeTopic}</p>
+          <h1>{activeTopic}</h1>
         </div>
         <div className="session-summary">
           <span>{activePersona.replace("-", " ")}</span>
           <span>{level}</span>
           <span>{duration} min</span>
         </div>
-        {renderProviderStatus()}
         <button className="secondary-button" onClick={resetSession} disabled={busy} type="button">
           <RotateCcw size={17} />
           New session
@@ -290,10 +258,6 @@ function App() {
             <h2>Interview</h2>
             <p>{messages.length ? `${messages.length} transcript turns` : "Starting..."}</p>
           </div>
-          <button className="assess-button" onClick={finishInterview} disabled={busy || messages.length === 0} type="button">
-            <Sparkles size={16} />
-            Evaluate
-          </button>
         </div>
 
         {error && <div className="error-box">{error}</div>}
@@ -331,12 +295,6 @@ function App() {
           </button>
         </div>
 
-        {assessment && (
-          <section className="assessment">
-            <h2>Evaluation and Improvements</h2>
-            <pre>{assessment}</pre>
-          </section>
-        )}
       </aside>
     </main>
   );

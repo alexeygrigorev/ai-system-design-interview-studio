@@ -155,7 +155,6 @@ button:disabled {
 
 .primary-button,
 .secondary-button,
-.assess-button,
 .tool-button,
 .component-chip {
   align-items: center;
@@ -178,11 +177,6 @@ button:disabled {
 .secondary-button {
   background: #e7edf5;
   color: #243045;
-}
-
-.assess-button {
-  background: #0f766e;
-  color: #ffffff;
 }
 
 .setup-start {
@@ -459,28 +453,6 @@ button:disabled {
   display: grid;
   gap: 10px;
   padding-top: 14px;
-}
-
-.assessment {
-  border-top: 1px solid #e1e7f0;
-  display: grid;
-  gap: 10px;
-  max-height: 280px;
-  overflow: auto;
-  padding-top: 14px;
-}
-
-.assessment pre {
-  background: #111827;
-  border-radius: 8px;
-  color: #e5e7eb;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  margin: 0;
-  overflow: auto;
-  padding: 12px;
-  white-space: pre-wrap;
 }
 
 .spin {
