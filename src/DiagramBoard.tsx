@@ -887,7 +887,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   </marker>
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
-                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth={selected ? "4" : "2.5"} markerEnd={`url(#${markerId})`} />
+                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={selected ? handleColor : connectorColor} strokeWidth={selected ? "7" : "2.5"} markerEnd={`url(#${markerId})`} />
               </g>
             );
           }
@@ -914,20 +914,30 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 className="connection-handle"
                 cx={endpoints.start.x}
                 cy={endpoints.start.y}
-                r="8"
+                r="11"
+                fill="#ffffff"
+                stroke={handleColor}
+                strokeWidth="4"
+                onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
+              />
+              <circle
+                className="connection-handle"
+                cx={endpoints.start.x}
+                cy={endpoints.start.y}
+                r="4"
                 fill={handleColor}
                 stroke="#ffffff"
-                strokeWidth="3"
+                strokeWidth="1"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
               />
               <circle
                 className="connection-handle"
                 cx={endpoints.end.x}
                 cy={endpoints.end.y}
-                r="8"
+                r="11"
                 fill={handleColor}
                 stroke="#ffffff"
-                strokeWidth="3"
+                strokeWidth="4"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "target")}
               />
             </>
