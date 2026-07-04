@@ -96,6 +96,10 @@ function findShapeAt(shapes: DiagramShape[], point: Point) {
     .find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
 }
 
+function isConnectableShape(shape: DiagramShape | null | undefined): shape is DiagramShape {
+  return Boolean(shape && shape.type !== "arrow" && shape.type !== "note");
+}
+
 function distanceToSegment(point: Point, start: Point, end: Point) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -471,8 +475,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
   function addNote(point: Point, sourceId?: string) {
     const source = sourceId ? shapes.find((shape) => shape.id === sourceId) : undefined;
-    const notePoint = source
-      ? { x: shapeBounds(source).x + shapeBounds(source).width + 138, y: centerOf(source).y }
+    const linkSource = isConnectableShape(source) ? source : undefined;
+    const notePoint = linkSource
+      ? { x: shapeBounds(linkSource).x + shapeBounds(linkSource).width + 138, y: centerOf(linkSource).y }
       : point;
     const next: DiagramShape = {
       id: crypto.randomUUID(),
@@ -484,9 +489,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       color: noteColor,
       label: "Note"
     };
-    const nextShapes = source
+    const nextShapes = linkSource
       ? (() => {
-        const sourceHandle = nearestConnectionHandle(source, centerOf(next));
+        const sourceHandle = nearestConnectionHandle(linkSource, centerOf(next));
         const targetHandle = nearestConnectionHandle(next, sourceHandle);
         const connector: DiagramShape = {
           id: crypto.randomUUID(),
@@ -497,7 +502,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           height: targetHandle.y - sourceHandle.y,
           color: connectorColor,
           connectorKind: "note-link",
-          sourceId: source.id,
+          sourceId: linkSource.id,
           targetId: next.id,
           sourceHandleId: sourceHandle.id,
           targetHandleId: targetHandle.id
@@ -513,7 +518,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   function addConnector(sourceId: string, sourceHandleId: string, target: DiagramShape, targetPoint: Point) {
     if (sourceId === target.id) return;
     const source = shapes.find((shape) => shape.id === sourceId);
-    if (!source) return;
+    if (!isConnectableShape(source) || !isConnectableShape(target)) return;
     const sourceHandle = connectionHandleById(source, sourceHandleId) ?? nearestConnectionHandle(source, centerOf(target));
     const targetHandle = nearestConnectionHandle(target, targetPoint);
     const next: DiagramShape = {
@@ -633,9 +638,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     if (reattachDrag) {
       const point = toCanvasPoint(event);
       const target = findShapeAt(shapes, point);
-      if (target) {
+      if (isConnectableShape(target)) {
         commitShapes((currentShapes) => currentShapes.map((shape) => {
           if (shape.id !== reattachDrag.arrowId || shape.type !== "arrow") return shape;
+          if (shape.connectorKind === "note-link") return shape;
           if (reattachDrag.endpoint === "source" && target.id === shape.targetId) return shape;
           if (reattachDrag.endpoint === "target" && target.id === shape.sourceId) return shape;
           const targetHandle = nearestConnectionHandle(target, point);
@@ -658,7 +664,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     if (connectorDrag) {
       const point = toCanvasPoint(event);
       const target = findShapeAt(shapes, point);
-      if (target) addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
+      if (isConnectableShape(target)) addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
       setConnectorDrag(null);
       return;
     }
@@ -778,6 +784,8 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
   function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: ConnectionHandle) {
     event.stopPropagation();
+    const source = shapes.find((shape) => shape.id === sourceId);
+    if (!isConnectableShape(source)) return;
     setSelectedId(sourceId);
     setConnectorDrag({ sourceId, sourceHandleId: start.id, start, current: start });
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1206,7 +1214,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           }
           return null;
         })}
-        {selectedShape && selectedShape.type !== "arrow" && connectionHandles(selectedShape).map((handle) => (
+        {isConnectableShape(selectedShape) && connectionHandles(selectedShape).map((handle) => (
           <circle
             key={`${selectedShape.id}-${handle.id}`}
             className="connection-handle"
@@ -1278,10 +1286,12 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       )}
       {contextMenu && (
         <div className="canvas-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
-          <button onClick={addContextNote} type="button">
-            <StickyNote size={16} />
-            Add note
-          </button>
+          {(!contextShape || isConnectableShape(contextShape)) && (
+            <button onClick={addContextNote} type="button">
+              <StickyNote size={16} />
+              Add note
+            </button>
+          )}
           {contextMenu.shapeId && (
             <>
               {contextShape && contextShape.type !== "arrow" && contextShape.type !== "note" && (
