@@ -122,14 +122,6 @@ function visualShapeBounds(shape: DiagramShape) {
     const visualHeight = 101;
     const visualX = label.x - visualWidth / 2;
     const visualY = label.y - 56.5;
-    if (shape.primitive === "vector-index") {
-      return {
-        x: visualX,
-        y: visualY - 8,
-        width: visualWidth + 8,
-        height: visualHeight + 8
-      };
-    }
     return {
       x: visualX,
       y: visualY,
@@ -768,7 +760,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                     strokeWidth={strokeWidth}
                   />
                   <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
+                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth={strokeWidth} />
                   {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
@@ -815,7 +807,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                     strokeWidth={strokeWidth}
                   />
                   <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
+                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth={strokeWidth} />
                   {shape.indexKind === "text" ? (
                     <>
                       <circle cx={visualX + visualWidth - 7} cy={topY - 12} r="7" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
