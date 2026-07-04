@@ -1,5 +1,5 @@
 export type CandidateLevel = "junior" | "mid-level" | "senior" | "staff";
-export type Persona = "neutral" | "adversarial";
+export type Persona = "supportive" | "neutral" | "adversarial";
 export type FeedbackMode = "end_only";
 
 export interface SessionConfig {

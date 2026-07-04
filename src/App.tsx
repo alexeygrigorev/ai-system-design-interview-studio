@@ -250,7 +250,7 @@ function App() {
     const resolvedConstraints = topic === "__random__"
       ? randomProblem.constraints
       : parseConstraints(constraintText);
-    const personas: Persona[] = ["neutral", "adversarial"];
+    const personas: Persona[] = ["supportive", "neutral", "adversarial"];
     const resolvedPersona = persona === "random"
       ? personas[Math.floor(Math.random() * personas.length)]
       : persona;
@@ -351,6 +351,7 @@ function App() {
             Interviewer
             <select value={persona} onChange={(event) => setPersona(event.target.value as Persona | "random")}>
               <option value="random">Random interviewer</option>
+              <option value="supportive">Supportive coach</option>
               <option value="neutral">Neutral evaluator</option>
               <option value="adversarial">Adversarial challenger</option>
             </select>

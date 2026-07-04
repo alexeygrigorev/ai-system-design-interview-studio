@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 export type CandidateLevel = "junior" | "mid-level" | "senior" | "staff";
-export type Persona = "neutral" | "adversarial";
+export type Persona = "supportive" | "neutral" | "adversarial";
 export type FeedbackMode = "end_only";
 
 export interface SessionConfig {
@@ -15,6 +15,7 @@ export interface SessionConfig {
 }
 
 const personaFiles: Record<Persona, string> = {
+  supportive: "03_persona_supportive_coach.md",
   neutral: "04_persona_neutral_evaluator.md",
   adversarial: "05_persona_adversarial_challenger.md"
 };
