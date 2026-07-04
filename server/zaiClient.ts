@@ -52,7 +52,7 @@ function providerErrorMessage(body: AnthropicResponse | null, response: Response
   return `Z.AI request failed (HTTP ${response.status}${statusText}${codeText})${messageText}`;
 }
 
-function toAnthropicPayload(messages: ChatMessage[], model: string, options: CallOptions = {}) {
+function toAnthropicPayload(messages: ChatMessage[], model: string, options: CallOptions = {}, stream = false) {
   const system = messages
     .filter((message) => message.role === "system")
     .map((message) => message.content.trim())
@@ -94,6 +94,7 @@ function toAnthropicPayload(messages: ChatMessage[], model: string, options: Cal
     model,
     max_tokens: options.maxTokens ?? 2048,
     temperature: options.temperature ?? 0.35,
+    ...(stream ? { stream: true } : {}),
     ...(system ? { system } : {}),
     messages: conversation
   };
@@ -154,4 +155,75 @@ export async function callZai(messages: ChatMessage[], options: CallOptions = {}
   }
 
   return content;
+}
+
+function parseStreamText(line: string) {
+  if (!line.startsWith("data:")) return "";
+  const payload = line.slice(5).trim();
+  if (!payload || payload === "[DONE]") return "";
+  try {
+    const event = JSON.parse(payload) as {
+      type?: string;
+      delta?: { text?: string };
+      content_block?: { text?: string };
+    };
+    return event.delta?.text ?? event.content_block?.text ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export async function* streamZai(messages: ChatMessage[], options: CallOptions = {}) {
+  const apiKey = process.env.ZAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("ZAI_API_KEY is not configured");
+  }
+
+  const baseUrl = process.env.ZAI_BASE_URL?.trim() || DEFAULT_BASE_URL;
+  const model = process.env.ZAI_MODEL?.trim() || DEFAULT_MODEL;
+  const payload = toAnthropicPayload(messages, model, options, true);
+
+  let response: Response;
+  try {
+    response = await fetch(buildMessagesUrl(baseUrl), {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Accept-Language": "en-US,en",
+        "anthropic-version": ANTHROPIC_VERSION
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    throw new Error("Z.AI request failed: network error contacting provider");
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as AnthropicResponse | null;
+    throw new Error(providerErrorMessage(body, response, apiKey));
+  }
+
+  if (!response.body) {
+    throw new Error("Z.AI returned an empty streaming response");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for await (const chunk of response.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const text = parseStreamText(line);
+      if (text) yield text;
+    }
+  }
+
+  buffer += decoder.decode();
+  for (const line of buffer.split(/\r?\n/)) {
+    const text = parseStreamText(line);
+    if (text) yield text;
+  }
 }

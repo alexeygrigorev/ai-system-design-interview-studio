@@ -30,16 +30,43 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-export function requestInterviewTurn(
+export async function requestInterviewTurnStream(
   session: SessionConfig,
   messages: ChatMessage[],
-  canvasSummary: DiagramShape[]
+  canvasSummary: DiagramShape[],
+  onToken: (token: string) => void
 ) {
-  return postJson<{ reply: string }>("/api/interview/turn", {
-    session,
-    messages,
-    canvasSummary
+  const response = await fetch("/api/interview/turn/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session,
+      messages,
+      canvasSummary
+    })
   });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? `Request failed with ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error("Streaming response was empty");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const token = decoder.decode(value, { stream: true });
+    if (token) onToken(token);
+  }
+
+  const tail = decoder.decode();
+  if (tail) onToken(tail);
 }
 
 export function requestInterviewBrief(

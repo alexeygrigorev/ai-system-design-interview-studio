@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadEnv } from "vite";
 import { buildDiagramPromptContext } from "./diagramContext.js";
 import { buildSystemPrompt, type SessionConfig } from "./promptPack.js";
-import { callZai, type ChatMessage } from "./zaiClient.js";
+import { callZai, streamZai, type ChatMessage } from "./zaiClient.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -122,6 +122,80 @@ function normalizeBrief(rawText: string, topic: string, seedConstraints: string[
   return fallback;
 }
 
+function formatList(items: string[], fallback: string) {
+  return items.length ? items.map((item) => `- ${item}`).join("\n") : `- ${fallback}`;
+}
+
+function buildProblemPrompt(session: SessionConfig) {
+  const brief = session.brief ?? {
+    problem: session.topic,
+    context: "Treat this as a production AI system design interview.",
+    constraints: session.constraints,
+    examples: []
+  };
+
+  return `Detailed interview problem prompt:
+
+Problem:
+${brief.problem}
+
+Context:
+${brief.context}
+
+Constraints:
+${formatList(brief.constraints, "No generated constraints.")}
+
+Examples:
+${formatList(brief.examples, "No generated examples.")}
+
+Opening interviewer question shown to the candidate:
+Before drawing the architecture, what would you clarify about users, success criteria, data sources, scale, latency, safety, and constraints?
+
+Use this problem prompt as the source of truth for the interview scenario. Do not ask the candidate to design the whole system before they have had a chance to clarify scope and assumptions.`;
+}
+
+function isGeneratedOpeningMessage(message: ChatMessage) {
+  return message.role === "assistant"
+    && message.content.trim().startsWith("Problem:")
+    && (
+      message.content.includes("Before drawing the architecture")
+      || message.content.includes("Generating scenario details")
+    );
+}
+
+function transcriptMessages(messages: ChatMessage[]) {
+  if (messages[0] && isGeneratedOpeningMessage(messages[0])) {
+    return messages.slice(1);
+  }
+  return messages;
+}
+
+async function buildTurnMessages(projectRoot: string, request: TurnRequest) {
+  const systemPrompt = await buildSystemPrompt(projectRoot, request.session);
+  const problemPrompt = buildProblemPrompt(request.session);
+  const diagramContext = buildDiagramPromptContext(request.canvasSummary);
+  const transcript = transcriptMessages(request.messages);
+  const instruction = transcript.length === 0
+    ? "Start the interview by asking only the opening clarification question from the problem prompt."
+    : "Continue the interview from the transcript. Ask the next best single follow-up question only.";
+
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: problemPrompt },
+    ...transcript,
+    {
+      role: "user",
+      content: `Current interviewer task:
+${instruction}
+
+Current diagram text context:
+${diagramContext.textContext}
+
+Use only the diagram text context as canvas evidence. Ask one concise question that responds to the candidate's latest answer and the current diagram.`
+    }
+  ] satisfies ChatMessage[];
+}
+
 app.get("/api/health", (_req, res) => {
   const zaiConfigured = Boolean(process.env.ZAI_API_KEY);
   res.json({
@@ -196,34 +270,41 @@ app.post("/api/interview/turn", async (req, res) => {
       throw new Error("ZAI_API_KEY is not configured");
     }
     const request = validateTurnRequest(req.body);
-    const systemPrompt = await buildSystemPrompt(projectRoot, request.session);
-    const diagramContext = buildDiagramPromptContext(request.canvasSummary);
-    const instruction = request.messages.length === 0
-      ? `Start the interview with the problem statement: "${request.session.topic}".
-
-Do not ask a broad question like "how would you design this system?"
-First, invite the candidate to clarify scope and assumptions. Keep the first turn short: name the system to design, then ask what they need to clarify about users, success criteria, data, scale, latency, safety, and constraints before drawing the architecture.`
-      : "Continue the interview from the transcript. Ask the next best single follow-up question only.";
-
-    const messages: ChatMessage[] = [
-      { role: "system", content: systemPrompt },
-      ...request.messages,
-      {
-        role: "user",
-        content: `${instruction}
-
-Current diagram text context:
-${diagramContext.textContext}
-
-Use only the diagram text context as canvas evidence. Ask one concise question.`
-      }
-    ];
-
+    const messages = await buildTurnMessages(projectRoot, request);
     const reply = await callZai(messages);
     res.json({ reply });
   } catch (error) {
     const response = errorResponse(error, "Unknown interview error");
     res.status(response.status).json({ error: response.error });
+  }
+});
+
+app.post("/api/interview/turn/stream", async (req, res) => {
+  try {
+    if (!process.env.ZAI_API_KEY) {
+      throw new Error("ZAI_API_KEY is not configured");
+    }
+    const request = validateTurnRequest(req.body);
+    const messages = await buildTurnMessages(projectRoot, request);
+
+    res.writeHead(200, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Content-Type-Options": "nosniff"
+    });
+
+    for await (const token of streamZai(messages)) {
+      res.write(token);
+    }
+    res.end();
+  } catch (error) {
+    const response = errorResponse(error, "Unknown streaming interview error");
+    if (!res.headersSent) {
+      res.status(response.status).json({ error: response.error });
+      return;
+    }
+    res.write(`\n\n[stream error: ${response.error}]`);
+    res.end();
   }
 });
 
@@ -234,11 +315,14 @@ app.post("/api/interview/assess", async (req, res) => {
     }
     const request = validateTurnRequest(req.body);
     const systemPrompt = await buildSystemPrompt(projectRoot, request.session);
+    const problemPrompt = buildProblemPrompt(request.session);
     const diagramContext = buildDiagramPromptContext(request.canvasSummary);
+    const transcript = transcriptMessages(request.messages);
 
     const messages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
-      ...request.messages,
+      { role: "user", content: problemPrompt },
+      ...transcript,
       {
         role: "user",
         content: `End the interview and provide final structured feedback in markdown.

@@ -1,9 +1,9 @@
 import { Bot, Loader2, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getHealth, requestInterviewBrief, requestInterviewTurn, type HealthStatus } from "./api";
+import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
 import { interviewProblems } from "./questionBank";
-import type { CandidateLevel, ChatMessage, DiagramShape, InterviewBrief, Persona, PrimitiveKind, SessionConfig } from "./types";
+import type { CandidateLevel, ChatMessage, DiagramShape, InterviewBrief, Persona, SessionConfig } from "./types";
 
 const SESSION_STORAGE_KEY = "ai-system-design-trainer.session.v1";
 
@@ -22,24 +22,6 @@ interface PersistedState {
   activeConstraints: string[];
   activeBrief?: InterviewBrief;
   remainingSeconds: number;
-}
-
-function humanizeKind(value?: PrimitiveKind) {
-  if (!value) return "component";
-  return value.replace("-", " ");
-}
-
-function diagramLabel(shape: DiagramShape) {
-  const label = shape.label?.trim();
-  if (label) return label;
-  return shape.primitive ? humanizeKind(shape.primitive) : "Unlabeled item";
-}
-
-function summarizeConnector(shape: DiagramShape, shapesById: Map<string, DiagramShape>) {
-  const source = shape.sourceId ? shapesById.get(shape.sourceId) : undefined;
-  const target = shape.targetId ? shapesById.get(shape.targetId) : undefined;
-  if (source && target) return `${diagramLabel(source)} -> ${diagramLabel(target)}`;
-  return "Unconnected connector";
 }
 
 function openingTurn(brief: InterviewBrief) {
@@ -96,52 +78,6 @@ function loadPersistedState(): Partial<PersistedState> {
   } catch {
     return {};
   }
-}
-
-function DiagramSummary({ shapes }: { shapes: DiagramShape[] }) {
-  const shapesById = new Map(shapes.map((shape) => [shape.id, shape]));
-  const components = shapes.filter((shape) => shape.type === "rect" || shape.type === "ellipse");
-  const connectors = shapes.filter((shape) => shape.type === "arrow");
-  const notes = shapes.filter((shape) => shape.type === "note");
-  const hasDiagram = components.length > 0 || connectors.length > 0 || notes.length > 0;
-  if (!hasDiagram) return null;
-
-  return (
-    <section className="ai-context-panel" aria-label="AI-visible diagram summary">
-      <div className="ai-context-heading">
-        <h3>AI sees</h3>
-        <span>{components.length} components</span>
-      </div>
-      <div className="ai-context-groups">
-        <div>
-          <h4>Components</h4>
-          {components.length ? (
-            <ul>
-              {components.map((shape) => (
-                <li key={shape.id}>{diagramLabel(shape)} <span>{humanizeKind(shape.primitive)}</span></li>
-              ))}
-            </ul>
-          ) : <p>None</p>}
-        </div>
-        <div>
-          <h4>Connections</h4>
-          {connectors.length ? (
-            <ul>
-              {connectors.map((shape) => <li key={shape.id}>{summarizeConnector(shape, shapesById)}</li>)}
-            </ul>
-          ) : <p>None</p>}
-        </div>
-        {notes.length > 0 && (
-          <div>
-            <h4>Notes</h4>
-            <ul>
-              {notes.map((shape) => <li key={shape.id}>{diagramLabel(shape)}</li>)}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
-  );
 }
 
 function App() {
@@ -317,14 +253,21 @@ function App() {
     }
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
     setAnswer("");
-    setMessages(nextMessages);
+    setMessages([...nextMessages, { role: "assistant", content: "" }]);
     setBusy(true);
     setError("");
     try {
-      const { reply } = await requestInterviewTurn(session, nextMessages, shapes);
-      setMessages([...nextMessages, { role: "assistant", content: reply }]);
+      let reply = "";
+      await requestInterviewTurnStream(session, nextMessages, shapes, (token) => {
+        reply += token;
+        setMessages([...nextMessages, { role: "assistant", content: reply }]);
+      });
+      if (!reply.trim()) {
+        throw new Error("Interviewer returned an empty response");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not continue interview");
+      setMessages(nextMessages);
     } finally {
       setBusy(false);
     }
@@ -421,28 +364,30 @@ function App() {
   return (
     <main className="interview-shell">
       <section className="workspace">
-        <DiagramBoard shapes={shapes} setShapes={setShapes} />
+        <DiagramBoard
+          shapes={shapes}
+          setShapes={setShapes}
+          sessionControls={(
+            <>
+              <details className="session-menu">
+                <summary aria-label="Session actions">
+                  <MoreVertical size={18} />
+                </summary>
+                <div className="session-menu-content">
+                  <button onClick={resetSession} disabled={busy} type="button">
+                    <RotateCcw size={16} />
+                    New session
+                  </button>
+                </div>
+              </details>
+              <span className="timer-pill">{formatTimer(remainingSeconds)}</span>
+            </>
+          )}
+        />
       </section>
 
       <aside className="interview-panel">
-        <div className="panel-heading compact-heading">
-          <span className="timer-pill">{formatTimer(remainingSeconds)}</span>
-          <details className="session-menu">
-            <summary aria-label="Session actions">
-              <MoreVertical size={18} />
-            </summary>
-            <div className="session-menu-content">
-              <button onClick={resetSession} disabled={busy} type="button">
-                <RotateCcw size={16} />
-                New session
-              </button>
-            </div>
-          </details>
-        </div>
-
         {error && <div className="error-box">{error}</div>}
-
-        <DiagramSummary shapes={shapes} />
 
         <div className="transcript">
           {messages.length === 0 && (
@@ -458,10 +403,9 @@ function App() {
                 </span>
                 <div className="message-role">{message.role === "assistant" ? "Interviewer" : "Candidate"}</div>
               </div>
-              <p>{message.content}</p>
+              <p>{message.content || (busy && index === messages.length - 1 ? "..." : "")}</p>
             </article>
           ))}
-          {busy && <div className="thinking"><Loader2 className="spin" size={17} /> Interviewer is thinking</div>}
         </div>
 
         <div className="answer-box">

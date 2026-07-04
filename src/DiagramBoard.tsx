@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   BrainCircuit,
   Database,
   GitBranch,
@@ -14,17 +13,19 @@ import {
   UserCheck
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { DiagramShape, Point, PrimitiveKind, Tool } from "./types";
 
 interface DiagramBoardProps {
   shapes: DiagramShape[];
   setShapes: Dispatch<SetStateAction<DiagramShape[]>>;
+  sessionControls?: ReactNode;
 }
 
 const componentColor = "#2563eb";
 const noteColor = "#d97706";
 const connectorColor = "#4b5563";
+const handleColor = "#0f766e";
 
 const componentKinds: Array<{ kind: PrimitiveKind; label: string; icon: typeof Server }> = [
   { kind: "service", label: "Service", icon: Server },
@@ -103,22 +104,31 @@ function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
   };
 }
 
-export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
+function connectionHandles(shape: DiagramShape) {
+  const bounds = shapeBounds(shape);
+  return [
+    { id: "top", x: bounds.x + bounds.width / 2, y: bounds.y },
+    { id: "right", x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+    { id: "bottom", x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+    { id: "left", x: bounds.x, y: bounds.y + bounds.height / 2 }
+  ];
+}
+
+export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoardProps) {
   const [tool, setTool] = useState<Tool>("select");
   const [componentKind, setComponentKind] = useState<PrimitiveKind>("service");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
-  const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; shapeId: string } | null>(null);
+  const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; start: Point; current: Point } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
   const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
   const [redoStack, setRedoStack] = useState<DiagramShape[][]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragSnapshotRef = useRef<DiagramShape[] | null>(null);
   const didDragRef = useRef(false);
 
-  const connectorSource = shapes.find((shape) => shape.id === connectorSourceId) ?? null;
+  const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
   const activeKind = componentKinds.find((kind) => kind.kind === componentKind) ?? componentKinds[0];
-  const ActiveKindIcon = activeKind.icon;
 
   const canvasClass = useMemo(() => (
     tool === "select" ? "drawing-surface selecting" : "drawing-surface"
@@ -149,7 +159,7 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
   function applyHistoricalShapes(nextShapes: DiagramShape[]) {
     setShapes(nextShapes);
     if (selectedId && !nextShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
-    if (connectorSourceId && !nextShapes.some((shape) => shape.id === connectorSourceId)) setConnectorSourceId(null);
+    if (connectorDrag && !nextShapes.some((shape) => shape.id === connectorDrag.sourceId)) setConnectorDrag(null);
     setContextMenu(null);
   }
 
@@ -187,9 +197,9 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     setTool("select");
   }
 
-  function addConnector(target: DiagramShape) {
-    if (!connectorSourceId || connectorSourceId === target.id) return;
-    const source = shapes.find((shape) => shape.id === connectorSourceId);
+  function addConnector(sourceId: string, target: DiagramShape) {
+    if (sourceId === target.id) return;
+    const source = shapes.find((shape) => shape.id === sourceId);
     if (!source) return;
     const start = centerOf(source);
     const end = centerOf(target);
@@ -206,7 +216,7 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(next.id);
-    setConnectorSourceId(null);
+    setConnectorDrag(null);
     setTool("select");
   }
 
@@ -216,22 +226,6 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
 
     if (tool === "component") {
       addComponent(point);
-      return;
-    }
-
-    if (tool === "note") {
-      addNote(point);
-      return;
-    }
-
-    if (tool === "connector") {
-      if (!hit) return;
-      if (!connectorSourceId) {
-        setConnectorSourceId(hit.id);
-        setSelectedId(hit.id);
-        return;
-      }
-      addConnector(hit);
       return;
     }
 
@@ -245,6 +239,10 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
   }
 
   function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (connectorDrag) {
+      setConnectorDrag({ ...connectorDrag, current: toCanvasPoint(event) });
+      return;
+    }
     if (tool !== "select" || !selectedId || !dragStart) return;
     const point = toCanvasPoint(event);
     const dx = point.x - dragStart.x;
@@ -257,7 +255,14 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     setDragStart(point);
   }
 
-  function onPointerUp() {
+  function onPointerUp(event: React.PointerEvent<SVGSVGElement>) {
+    if (connectorDrag) {
+      const point = toCanvasPoint(event);
+      const target = findShapeAt(shapes, point);
+      if (target) addConnector(connectorDrag.sourceId, target);
+      setConnectorDrag(null);
+      return;
+    }
     if (didDragRef.current && dragSnapshotRef.current) {
       rememberHistory(dragSnapshotRef.current);
     }
@@ -268,7 +273,7 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
 
   function selectTool(nextTool: Tool) {
     setTool(nextTool);
-    if (nextTool !== "connector") setConnectorSourceId(null);
+    setConnectorDrag(null);
     setContextMenu(null);
   }
 
@@ -303,7 +308,7 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     }
     commitShapes(() => []);
     setSelectedId(null);
-    setConnectorSourceId(null);
+    setConnectorDrag(null);
     setContextMenu(null);
     setTool("select");
   }
@@ -313,11 +318,25 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     const point = toCanvasPoint(event);
     const hit = findShapeAt(shapes, point);
     if (!hit) {
-      setContextMenu(null);
+      setSelectedId(null);
+      setContextMenu({ x: event.clientX, y: event.clientY, point });
       return;
     }
     setSelectedId(hit.id);
-    setContextMenu({ x: event.clientX, y: event.clientY, shapeId: hit.id });
+    setContextMenu({ x: event.clientX, y: event.clientY, point, shapeId: hit.id });
+  }
+
+  function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: Point) {
+    event.stopPropagation();
+    setSelectedId(sourceId);
+    setConnectorDrag({ sourceId, start, current: start });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function addContextNote() {
+    if (!contextMenu) return;
+    addNote(contextMenu.point);
+    setContextMenu(null);
   }
 
   useEffect(() => {
@@ -360,19 +379,15 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           <button className={tool === "select" ? "icon-button active" : "icon-button"} onClick={() => selectTool("select")} title="Pointer" type="button">
             <MousePointer2 size={18} />
           </button>
-          <button className={tool === "component" ? "tool-button active" : "tool-button"} onClick={() => selectTool("component")} type="button">
-            <ActiveKindIcon size={16} />
-            Add component
-          </button>
-          <button className={tool === "connector" ? "tool-button active" : "tool-button"} onClick={() => selectTool("connector")} type="button">
-            <ArrowRight size={16} />
-            Connect
-          </button>
-          <button className={tool === "note" ? "tool-button active" : "tool-button"} onClick={() => selectTool("note")} type="button">
-            <StickyNote size={16} />
-            Note
-          </button>
         </div>
+        <div className="component-toolbar" aria-label="Component types">
+          {componentKinds.map(({ kind, label, icon: Icon }) => (
+            <button key={kind} className={componentKind === kind ? "component-chip active" : "component-chip"} onClick={() => { setComponentKind(kind); selectTool("component"); }} title={label} type="button">
+              <Icon size={15} />
+            </button>
+          ))}
+        </div>
+        {sessionControls && <div className="canvas-session-controls">{sessionControls}</div>}
         <div className="tool-actions">
           <button className="icon-button" onClick={undo} disabled={!undoStack.length} title="Undo" type="button">
             <Undo2 size={18} />
@@ -384,15 +399,6 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
             <Trash2 size={18} />
           </button>
         </div>
-      </div>
-
-      <div className="component-toolbar" aria-label="Component types">
-        {componentKinds.map(({ kind, label, icon: Icon }) => (
-          <button key={kind} className={componentKind === kind ? "component-chip active" : "component-chip"} onClick={() => { setComponentKind(kind); selectTool("component"); }} type="button">
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
       </div>
 
       <svg
@@ -410,8 +416,16 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           </pattern>
         </defs>
         <rect width="1200" height="760" fill="url(#grid)" />
-        {connectorSource && (
-          <circle cx={centerOf(connectorSource).x} cy={centerOf(connectorSource).y} r="9" fill="#0f766e" />
+        {connectorDrag && (
+          <line
+            x1={connectorDrag.start.x}
+            y1={connectorDrag.start.y}
+            x2={connectorDrag.current.x}
+            y2={connectorDrag.current.y}
+            stroke={handleColor}
+            strokeDasharray="10 8"
+            strokeWidth="5"
+          />
         )}
         {shapes.map((shape) => {
           const selected = shape.id === selectedId;
@@ -460,13 +474,32 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           }
           return null;
         })}
+        {selectedShape && selectedShape.type !== "arrow" && connectionHandles(selectedShape).map((handle) => (
+          <circle
+            key={`${selectedShape.id}-${handle.id}`}
+            className="connection-handle"
+            cx={handle.x}
+            cy={handle.y}
+            r="8"
+            fill={handleColor}
+            stroke="#ffffff"
+            strokeWidth="3"
+            onPointerDown={(event) => startConnectorDrag(event, selectedShape.id, handle)}
+          />
+        ))}
       </svg>
       {contextMenu && (
         <div className="canvas-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
-          <button onClick={deleteSelected} disabled={selectedId !== contextMenu.shapeId} type="button">
-            <Trash2 size={16} />
-            Delete
+          <button onClick={addContextNote} type="button">
+            <StickyNote size={16} />
+            Add note
           </button>
+          {contextMenu.shapeId && (
+            <button className="danger" onClick={deleteSelected} disabled={selectedId !== contextMenu.shapeId} type="button">
+              <Trash2 size={16} />
+              Delete
+            </button>
+          )}
         </div>
       )}
     </section>

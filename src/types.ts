@@ -24,7 +24,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export type Tool = "select" | "component" | "note" | "connector";
+export type Tool = "select" | "component";
 export type PrimitiveKind = "service" | "datastore" | "queue" | "vector-index" | "model" | "tool" | "human-review";
 export type ShapeType = "rect" | "ellipse" | "note" | "arrow";
 
