@@ -250,6 +250,7 @@ button:disabled {
 .hint-item {
   display: grid;
   gap: 3px;
+  position: relative;
 }
 
 .hint-item label {
@@ -275,16 +276,30 @@ button:disabled {
 }
 
 .hint-explanation {
-  color: #667085;
-  display: none;
+  background: #263245;
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  color: #ffffff;
+  left: calc(100% + 10px);
+  max-width: 260px;
+  opacity: 0;
   font-size: 12px;
   line-height: 1.35;
-  padding-left: 21px;
+  padding: 8px 10px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+  visibility: hidden;
+  width: max-content;
+  z-index: 30;
 }
 
 .hint-item:hover .hint-explanation,
 .hint-item:focus-within .hint-explanation {
-  display: block;
+  opacity: 1;
+  visibility: visible;
 }
 
 .diagram-text-popover {
@@ -733,5 +748,13 @@ button:disabled {
   .board-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .hint-explanation {
+    bottom: calc(100% + 6px);
+    left: 0;
+    max-width: 240px;
+    top: auto;
+    transform: none;
   }
 }
