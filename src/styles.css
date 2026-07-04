@@ -583,6 +583,9 @@ button:disabled {
 }
 
 .note-label-editor {
+  background: #fff7d6;
+  box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.22);
+  padding: 1px 4px 2px;
   text-align: left;
   transform: translateY(-50%);
 }
