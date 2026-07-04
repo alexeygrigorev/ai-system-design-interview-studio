@@ -44,7 +44,6 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     provider: "zai",
-    model: process.env.ZAI_MODEL ?? "glm-5.2",
     zaiConfigured,
     ready: zaiConfigured
   });
@@ -76,7 +75,10 @@ app.post("/api/interview/turn", async (req, res) => {
     const systemPrompt = await buildSystemPrompt(projectRoot, request.session);
     const diagramContext = buildDiagramPromptContext(request.canvasSummary);
     const instruction = request.messages.length === 0
-      ? "Start the interview. Ask the opening system design question only."
+      ? `Start the interview with the problem statement: "${request.session.topic}".
+
+Do not ask a broad question like "how would you design this system?"
+First, invite the candidate to clarify scope and assumptions. Keep the first turn short: name the system to design, then ask what they need to clarify about users, success criteria, data, scale, latency, safety, and constraints before drawing the architecture.`
       : "Continue the interview from the transcript. Ask the next best single follow-up question only.";
 
     const messages: ChatMessage[] = [
@@ -89,10 +91,7 @@ app.post("/api/interview/turn", async (req, res) => {
 Current diagram text context:
 ${diagramContext.textContext}
 
-Raw canvas JSON (secondary evidence):
-${diagramContext.rawJson}
-
-Use the diagram text context as primary canvas evidence and the raw JSON only as secondary evidence. Ask one concise question.`
+Use only the diagram text context as canvas evidence. Ask one concise question.`
       }
     ];
 
@@ -122,9 +121,6 @@ app.post("/api/interview/assess", async (req, res) => {
 
 Diagram text context:
 ${diagramContext.textContext}
-
-Raw canvas JSON (secondary evidence):
-${diagramContext.rawJson}
 
 Use the configured rubric. Include:
 - Overall assessment.

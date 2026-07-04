@@ -107,8 +107,7 @@ button:disabled {
 .board-toolbar,
 .tool-strip,
 .tool-actions,
-.interview-header,
-.session-summary {
+.message-header {
   align-items: center;
   display: flex;
 }
@@ -132,25 +131,6 @@ button:disabled {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr 1fr;
-}
-
-.advanced-settings {
-  border: 1px solid #dbe3ee;
-  border-radius: 8px;
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-}
-
-.advanced-settings summary {
-  color: #344154;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.advanced-settings[open] summary {
-  margin-bottom: 12px;
 }
 
 .primary-button,
@@ -183,83 +163,14 @@ button:disabled {
   width: 100%;
 }
 
-.provider-status {
-  align-items: center;
-  border-radius: 7px;
-  display: flex;
-  font-size: 13px;
-  font-weight: 800;
-  gap: 8px;
-  padding: 9px 10px;
-}
-
-.provider-status.ready {
-  background: #ecfdf5;
-  color: #166534;
-}
-
-.provider-status.checking {
-  background: #eef4ff;
-  color: #1d4ed8;
-}
-
-.provider-status.missing {
-  background: #fff7ed;
-  color: #9a3412;
-}
-
-.provider-status.failure {
-  background: #fef2f2;
-  color: #991b1b;
-}
-
 .interview-shell {
   display: grid;
   grid-template-columns: minmax(520px, 1fr) 410px;
-  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100vh;
-}
-
-.interview-header {
-  background: #ffffff;
-  border-bottom: 1px solid #d9e0eb;
-  gap: 16px;
-  grid-column: 1 / -1;
-  justify-content: space-between;
-  min-height: 72px;
-  padding: 12px 18px;
-}
-
-.interview-header > div:first-child {
-  min-width: 0;
-}
-
-.interview-header p {
-  max-width: 780px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-summary {
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.session-summary span {
-  background: #f4f6fa;
-  border: 1px solid #dfe6f0;
-  border-radius: 6px;
-  color: #445168;
-  font-size: 12px;
-  font-weight: 800;
-  padding: 6px 8px;
-  text-transform: capitalize;
 }
 
 .workspace {
   min-width: 0;
-  padding: 14px;
 }
 
 .interview-panel {
@@ -268,18 +179,18 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: calc(100vh - 72px);
-  padding: 18px;
+  min-height: 100vh;
+  padding: 12px;
 }
 
 .board-panel {
   background: #ffffff;
-  border: 1px solid #d8e0eb;
-  border-radius: 8px;
+  border: 0;
   display: grid;
   grid-template-rows: auto auto auto minmax(420px, 1fr);
-  height: calc(100vh - 100px);
+  height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 .board-toolbar {
@@ -383,6 +294,162 @@ button:disabled {
   gap: 12px;
 }
 
+.compact-heading {
+  min-height: 34px;
+}
+
+.timer-pill {
+  background: #f4f6fa;
+  border: 1px solid #dbe3ee;
+  border-radius: 7px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 7px 9px;
+}
+
+.session-menu {
+  position: relative;
+}
+
+.session-menu summary {
+  align-items: center;
+  background: #f4f6fa;
+  border: 1px solid #dbe3ee;
+  border-radius: 7px;
+  color: #263245;
+  cursor: pointer;
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  list-style: none;
+  width: 34px;
+}
+
+.session-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.session-menu-content {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  display: grid;
+  min-width: 170px;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: 40px;
+  z-index: 5;
+}
+
+.session-menu-content button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #263245;
+  cursor: pointer;
+  display: flex;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px;
+  text-align: left;
+}
+
+.session-menu-content button:hover {
+  background: #f4f6fa;
+}
+
+.canvas-context-menu {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  padding: 6px;
+  position: fixed;
+  z-index: 10;
+}
+
+.canvas-context-menu button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #b91c1c;
+  cursor: pointer;
+  display: flex;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 34px;
+  min-width: 120px;
+  padding: 8px;
+}
+
+.canvas-context-menu button:hover {
+  background: #fef2f2;
+}
+
+.ai-context-panel {
+  background: #f8fafc;
+  border: 1px solid #e0e6ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.ai-context-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.ai-context-heading h3,
+.ai-context-groups h4 {
+  color: #273246;
+  font-size: 12px;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.ai-context-heading span {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-context-panel p,
+.ai-context-panel li {
+  color: #344154;
+  font-size: 13px;
+}
+
+.ai-context-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-context-groups ul {
+  display: grid;
+  gap: 5px;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.ai-context-groups li {
+  line-height: 1.35;
+}
+
+.ai-context-groups li span {
+  color: #7b8796;
+}
+
 .transcript {
   display: flex;
   flex: 1;
@@ -435,11 +502,31 @@ button:disabled {
   border-color: #f4d89b;
 }
 
+.message-header {
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.message-avatar {
+  align-items: center;
+  background: #e7edf5;
+  border-radius: 7px;
+  color: #263245;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.message.user .message-avatar {
+  background: #fdecc7;
+  color: #7c2d12;
+}
+
 .message-role {
   color: #334155;
   font-size: 12px;
   font-weight: 900;
-  margin-bottom: 6px;
   text-transform: uppercase;
 }
 
@@ -470,19 +557,10 @@ button:disabled {
     display: block;
   }
 
-  .interview-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .interview-panel {
     border-left: 0;
     border-top: 1px solid #d9e0eb;
     min-height: 560px;
-  }
-
-  .board-panel {
-    height: 72vh;
   }
 }
 
@@ -498,10 +576,6 @@ button:disabled {
   .field-grid,
   .selection-bar {
     grid-template-columns: 1fr;
-  }
-
-  .workspace {
-    padding: 10px;
   }
 
   .board-toolbar {

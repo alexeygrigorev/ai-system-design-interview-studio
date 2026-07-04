@@ -36,7 +36,6 @@ interface EndpointResolution {
 
 export interface DiagramPromptContext {
   textContext: string;
-  rawJson: string;
 }
 
 const CONNECT_DISTANCE_LIMIT = 48;
@@ -155,6 +154,14 @@ function compareArtifacts(a: DiagramArtifact, b: DiagramArtifact) {
 function connectionLabel(artifact: DiagramArtifact) {
   const base = artifact.label ?? `unlabeled ${artifact.primitive ?? artifact.type}`;
   return `${quoteText(base)} [id=${quoteText(artifact.id)}]`;
+}
+
+function simpleName(artifact: DiagramArtifact) {
+  return normalizeText(artifact.label ?? artifact.primitive ?? artifact.type);
+}
+
+function simpleKind(artifact: DiagramArtifact) {
+  return artifact.primitive ? normalizeText(artifact.primitive.replace("-", " ")) : artifact.kind;
 }
 
 function artifactDisplay(artifact: DiagramArtifact) {
@@ -329,12 +336,16 @@ function formatResolution(resolution: EndpointResolution | undefined) {
 
 function formatComponents(components: DiagramArtifact[]) {
   if (!components.length) return ["- None detected."];
-  return [...components].sort(compareArtifacts).map((artifact) => `- ${artifactDisplay(artifact)}`);
+  return [...components]
+    .sort(compareArtifacts)
+    .map((artifact) => `- ${simpleName(artifact)} (${simpleKind(artifact)})`);
 }
 
 function formatNotes(notes: DiagramArtifact[]) {
   if (!notes.length) return ["- None detected."];
-  return [...notes].sort(compareArtifacts).map((artifact) => `- ${artifactDisplay(artifact)}`);
+  return [...notes]
+    .sort(compareArtifacts)
+    .map((artifact) => `- ${simpleName(artifact)}`);
 }
 
 function formatRelationships(arrows: DiagramArtifact[], connectableArtifacts: DiagramArtifact[]) {
@@ -348,11 +359,11 @@ function formatRelationships(arrows: DiagramArtifact[], connectableArtifacts: Di
     if (explicitSource && explicitTarget) {
       connectedIds.add(explicitSource.id);
       connectedIds.add(explicitTarget.id);
-      return `- Arrow ${quoteText(arrow.id)}: ${connectionLabel(explicitSource)} -> ${connectionLabel(explicitTarget)}; sourceId=${quoteText(explicitSource.id)}; targetId=${quoteText(explicitTarget.id)}; relationship is explicitly attached in the canvas.`;
+      return `- ${simpleName(explicitSource)} -> ${simpleName(explicitTarget)}`;
     }
 
     if (!arrow.start || !arrow.end) {
-      return `- Arrow ${quoteText(arrow.id)}: unresolved because endpoint coordinates are incomplete; ${artifactDisplay(arrow)}`;
+      return "- Unconnected connector";
     }
 
     const source = resolveEndpoint(arrow.start, connectableArtifacts);
@@ -361,10 +372,10 @@ function formatRelationships(arrows: DiagramArtifact[], connectableArtifacts: Di
     if (target) connectedIds.add(target.artifact.id);
 
     const relationship = source && target
-      ? `${connectionLabel(source.artifact)} -> ${connectionLabel(target.artifact)}`
-      : `unresolved arrow from ${formatResolution(source)} to ${formatResolution(target)}`;
+      ? `${simpleName(source.artifact)} -> ${simpleName(target.artifact)}`
+      : "Unconnected connector";
 
-    return `- Arrow ${quoteText(arrow.id)}: ${relationship}; start=${formatResolution(source)}; end=${formatResolution(target)}; direction follows arrow start to arrowhead.`;
+    return `- ${relationship}`;
   });
 
   return { lines, connectedIds };
@@ -383,33 +394,22 @@ function formatUnconnectedArtifacts(
   }).sort(compareArtifacts);
 
   if (!unconnected.length) return ["- None detected."];
-  return unconnected.map((artifact) => `- ${artifactDisplay(artifact)}`);
-}
-
-function stringifyRawJson(canvasSummary: unknown) {
-  try {
-    return JSON.stringify(canvasSummary, null, 2) ?? "undefined";
-  } catch {
-    return "[Unable to stringify canvas summary]";
-  }
+  return unconnected.map((artifact) => `- ${simpleName(artifact)} (${simpleKind(artifact)})`);
 }
 
 export function buildDiagramPromptContext(canvasSummary: unknown): DiagramPromptContext {
   const normalizedCanvasSummary = canvasSummary === undefined ? [] : canvasSummary;
   const artifacts = parseArtifacts(normalizedCanvasSummary);
-  const rawJson = stringifyRawJson(normalizedCanvasSummary);
 
   if (!artifacts) {
     return {
-      textContext: `Malformed diagram canvasSummary: expected an array of diagram components, but received ${describeValueType(normalizedCanvasSummary)} (malformed/not-array). Raw canvas JSON is secondary evidence only.`,
-      rawJson
+      textContext: `Malformed diagram canvasSummary: expected an array of diagram components, but received ${describeValueType(normalizedCanvasSummary)}.`
     };
   }
 
   if (!artifacts.length) {
     return {
-      textContext: "No diagram components provided.",
-      rawJson
+      textContext: "No diagram components provided."
     };
   }
 
@@ -423,8 +423,6 @@ export function buildDiagramPromptContext(canvasSummary: unknown): DiagramPrompt
 
   return {
     textContext: [
-      "Arrow endpoint matching rule: endpoint-inside-bounds first; otherwise nearest component within 48 units; notes are annotations only and are not matched as relationship endpoints; ties are resolved deterministically by distance, bounds area, center distance, and stable artifact fields.",
-      "",
       "Components:",
       ...formatComponents(components),
       "",
@@ -436,7 +434,6 @@ export function buildDiagramPromptContext(canvasSummary: unknown): DiagramPrompt
       "",
       "Unconnected or non-relationship artifacts:",
       ...unconnected
-    ].join("\n"),
-    rawJson
+    ].join("\n")
   };
 }

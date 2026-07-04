@@ -3,7 +3,6 @@ import type { ChatMessage, DiagramShape, SessionConfig } from "./types";
 export interface HealthStatus {
   ok: boolean;
   provider: string;
-  model: string;
   zaiConfigured: boolean;
   ready: boolean;
 }

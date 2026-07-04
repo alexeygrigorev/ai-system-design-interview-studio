@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 export type CandidateLevel = "junior" | "mid-level" | "senior" | "staff";
-export type Persona = "supportive" | "neutral" | "adversarial";
+export type Persona = "neutral" | "adversarial";
 export type FeedbackMode = "end_only";
 
 export interface SessionConfig {
@@ -15,7 +15,6 @@ export interface SessionConfig {
 }
 
 const personaFiles: Record<Persona, string> = {
-  supportive: "03_persona_supportive_coach.md",
   neutral: "04_persona_neutral_evaluator.md",
   adversarial: "05_persona_adversarial_challenger.md"
 };
@@ -56,8 +55,8 @@ ${sessionPrompt}
 ${personaPrompt}
 
 Application instructions:
-- The candidate may use a diagram canvas. Treat diagram text context as primary canvas evidence and raw canvas JSON as secondary evidence, not as a replacement for spoken reasoning.
-- Do not infer details that are not represented in the transcript, diagram text context, or raw canvas JSON.
+- The candidate may use a diagram canvas. Treat diagram text context as canvas evidence, not as a replacement for spoken reasoning.
+- Do not infer details that are not represented in the transcript or diagram text context.
 - Ask exactly one interviewer question per turn.
 - Keep interviewer turns concise.
 - For final assessment, base scores only on the transcript and canvas artifacts provided.`;
