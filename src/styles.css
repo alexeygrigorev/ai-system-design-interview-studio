@@ -649,6 +649,8 @@ button:disabled {
   border: 1px solid #dbe3ee;
   border-radius: 8px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  max-height: min(520px, calc(100vh - 32px));
+  overflow: auto;
   padding: 6px;
   position: fixed;
   z-index: 10;
@@ -673,12 +675,35 @@ button:disabled {
   background: #f4f6fa;
 }
 
+.canvas-context-menu button.active {
+  background: #eef0ff;
+  color: #3546b6;
+}
+
 .canvas-context-menu button.danger {
   color: #b91c1c;
 }
 
 .canvas-context-menu button.danger:hover {
   background: #fef2f2;
+}
+
+.context-menu-group {
+  border-top: 1px solid #edf1f6;
+  display: grid;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.context-menu-label {
+  align-items: center;
+  color: #667085;
+  display: flex;
+  font-size: 11px;
+  font-weight: 650;
+  gap: 6px;
+  padding: 7px 8px 5px;
+  text-transform: none;
 }
 
 .transcript {

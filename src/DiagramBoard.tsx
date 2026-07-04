@@ -3,6 +3,7 @@ import {
   Cpu,
   Database,
   Layers3,
+  ListRestart,
   Minus,
   MousePointer2,
   Plus,
@@ -770,18 +771,42 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   }
 
   function chooseIndexKind(shapeId: string, indexKind: "vector" | "text") {
-    setShapes((currentShapes) => currentShapes.map((shape) => (
-      shape.id === shapeId ? { ...shape, indexKind, label: "Index" } : shape
+    commitShapes((currentShapes) => currentShapes.map((shape) => (
+      shape.id === shapeId ? { ...shape, indexKind, label: shape.label ?? "Index" } : shape
     )));
     setIndexChooser(null);
   }
 
   function toggleIndexKind(shapeId: string) {
-    setShapes((currentShapes) => currentShapes.map((shape) => {
+    commitShapes((currentShapes) => currentShapes.map((shape) => {
       if (shape.id !== shapeId || shape.primitive !== "vector-index") return shape;
       return { ...shape, indexKind: shape.indexKind === "text" ? "vector" : "text" };
     }));
     setContextMenu(null);
+  }
+
+  function changeShapePrimitive(shapeId: string, primitive: PrimitiveKind) {
+    commitShapes((currentShapes) => {
+      const changedShapes = currentShapes.map((shape) => {
+        if (shape.id !== shapeId || shape.type === "arrow" || shape.type === "note") return shape;
+        const nextSize = defaultSize(primitive);
+        const center = centerOf(shape);
+        return {
+          ...shape,
+          type: nextSize.type,
+          primitive,
+          x: center.x - nextSize.width / 2,
+          y: center.y - nextSize.height / 2,
+          width: nextSize.width,
+          height: nextSize.height,
+          indexKind: primitive === "vector-index" ? shape.indexKind ?? "vector" : undefined
+        };
+      });
+      return refreshArrowsForMovedShape(changedShapes, shapeId);
+    });
+    setSelectedId(shapeId);
+    setContextMenu(null);
+    setIndexChooser(null);
   }
 
   useEffect(() => {
@@ -1215,6 +1240,25 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           </button>
           {contextMenu.shapeId && (
             <>
+              {contextShape && contextShape.type !== "arrow" && contextShape.type !== "note" && (
+                <div className="context-menu-group">
+                  <div className="context-menu-label">
+                    <ListRestart size={14} />
+                    Change type
+                  </div>
+                  {componentKinds.map(({ kind, label, icon: Icon }) => (
+                    <button
+                      key={kind}
+                      className={contextShape.primitive === kind ? "active" : ""}
+                      onClick={() => changeShapePrimitive(contextMenu.shapeId!, kind)}
+                      type="button"
+                    >
+                      <Icon size={16} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {contextShape?.primitive === "vector-index" && (
                 <button onClick={() => toggleIndexKind(contextMenu.shapeId!)} type="button">
                   {contextShape.indexKind === "text" ? "Switch to Vector" : "Switch to Text"}
