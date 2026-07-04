@@ -404,6 +404,12 @@ button:disabled {
   width: 34px;
 }
 
+.session-menu[open] summary {
+  background: #eef0ff;
+  border-color: #5b6ee1;
+  color: #3546b6;
+}
+
 .session-menu summary::-webkit-details-marker {
   display: none;
 }
@@ -414,12 +420,12 @@ button:disabled {
   border-radius: 8px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
   display: grid;
-  left: 0;
-  min-width: 170px;
+  min-width: 190px;
   padding: 6px;
   position: absolute;
+  right: 0;
   top: 40px;
-  z-index: 5;
+  z-index: 20;
 }
 
 .session-menu-content button {

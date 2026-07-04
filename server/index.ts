@@ -232,10 +232,12 @@ Return exactly this JSON schema:
 {
   "problem": "one sentence, specific but not solution-revealing",
   "context": "one short paragraph with product or domain detail",
-  "constraints": ["2-4 concrete constraints"],
+  "constraints": ["2-4 candidate-visible business, domain, safety, compliance, or user-facing requirements"],
   "examples": ["2-3 representative user inputs, documents, requests, or edge cases"]
 }
 
+Constraints must not reveal implementation tactics, evaluation design, chunking strategy, retrieval strategy, observability, metrics, or architecture hints unless the topic itself makes them a business requirement.
+Use seed constraints only when they are candidate-visible product/domain requirements; do not simply copy technical seed constraints.
 Keep the total under 140 words. Do not solve the architecture.`
       }
     ], { maxTokens: 380, temperature: 0.7 });

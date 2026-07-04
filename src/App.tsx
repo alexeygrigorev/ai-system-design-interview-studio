@@ -1,4 +1,4 @@
-import { Bot, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
+import { Bot, Download, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -24,20 +24,39 @@ interface PersistedState {
   remainingSeconds: number;
 }
 
+const hiddenTechnicalRequirementPhrases = [
+  "automated evaluation",
+  "chunking",
+  "document-wide context",
+  "faithfulness",
+  "launch-blocking metrics",
+  "monitoring",
+  "retrieval recall",
+  "unanswerable"
+];
+
+function candidateVisibleRequirements(constraints: string[]) {
+  return constraints.filter((constraint) => {
+    const normalized = constraint.toLowerCase();
+    return !hiddenTechnicalRequirementPhrases.some((phrase) => normalized.includes(phrase));
+  });
+}
+
 function openingTurn(brief: InterviewBrief) {
-  const constraints = brief.constraints.map((constraint) => `- ${constraint}`).join("\n");
+  const requirements = candidateVisibleRequirements(brief.constraints);
+  const requirementBlock = requirements.length
+    ? `\nKnown requirements:\n${requirements.map((constraint) => `- ${constraint}`).join("\n")}\n`
+    : "";
   const examples = brief.examples.map((example) => `- ${example}`).join("\n");
   return `Problem: ${brief.problem}
 
 ${brief.context}
-
-Constraints:
-${constraints}
+${requirementBlock}
 
 Examples:
 ${examples}
 
-Before drawing the architecture, what would you clarify about users, success criteria, data sources, scale, latency, safety, and constraints?`;
+Let's begin. What would you ask or establish first?`;
 }
 
 function openingPlaceholder(topic: string) {
@@ -66,6 +85,22 @@ function formatTimer(seconds: number) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = safeSeconds % 60;
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function filenamePart(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "interview";
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function loadPersistedState(): Partial<PersistedState> {
@@ -287,6 +322,50 @@ function App() {
     setScreen("setup");
   }
 
+  function restartCurrentProblem() {
+    if (!activeBrief) return;
+    setMessages([{ role: "assistant", content: openingTurn(activeBrief) }]);
+    setAnswer("");
+    setError("");
+    setShapes([]);
+    setRemainingSeconds(duration * 60);
+    setScreen("interview");
+  }
+
+  function saveSessionSnapshot() {
+    const snapshot = {
+      savedAt: new Date().toISOString(),
+      session,
+      messages,
+      shapes,
+      remainingSeconds,
+      answer
+    };
+    downloadTextFile(
+      `${filenamePart(activeTopic)}-session.json`,
+      `${JSON.stringify(snapshot, null, 2)}\n`,
+      "application/json"
+    );
+  }
+
+  function saveDiagramSvg() {
+    const svg = document.querySelector<SVGSVGElement>("svg.drawing-surface");
+    if (!svg) {
+      setError("Could not find the diagram SVG to save.");
+      return;
+    }
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const rect = svg.getBoundingClientRect();
+    clone.setAttribute("width", String(Math.round(rect.width)));
+    clone.setAttribute("height", String(Math.round(rect.height)));
+    downloadTextFile(
+      `${filenamePart(activeTopic)}-diagram.svg`,
+      `${new XMLSerializer().serializeToString(clone)}\n`,
+      "image/svg+xml"
+    );
+  }
+
   if (screen === "setup") {
     return (
       <main className="setup-screen">
@@ -375,8 +454,20 @@ function App() {
                 </summary>
                 <div className="session-menu-content">
                   <button onClick={resetSession} disabled={busy} type="button">
+                    <ListRestart size={16} />
+                    Select problem
+                  </button>
+                  <button onClick={restartCurrentProblem} disabled={busy || !activeBrief} type="button">
                     <RotateCcw size={16} />
-                    New session
+                    Restart problem
+                  </button>
+                  <button onClick={saveSessionSnapshot} type="button">
+                    <Download size={16} />
+                    Save session
+                  </button>
+                  <button onClick={saveDiagramSvg} type="button">
+                    <Download size={16} />
+                    Save SVG
                   </button>
                 </div>
               </details>
