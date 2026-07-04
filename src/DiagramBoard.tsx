@@ -26,7 +26,8 @@ interface DiagramBoardProps {
 
 const componentColor = "#2563eb";
 const noteColor = "#d97706";
-const connectorColor = "#4b5563";
+const connectorColor = "#94a3b8";
+const selectedConnectorColor = "#111827";
 const handleColor = "#0f766e";
 const shapeLabelSize = 14;
 const shapeLabelWeight = 500;
@@ -888,11 +889,11 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
               <g key={shape.id}>
                 <defs>
                   <marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-                    <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
+                    <path d="M 0 0 L 8 3 L 0 6 z" fill={selected ? selectedConnectorColor : connectorColor} />
                   </marker>
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
-                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={selected ? handleColor : connectorColor} strokeWidth={selected ? "7" : "2.5"} markerEnd={`url(#${markerId})`} />
+                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={selected ? selectedConnectorColor : connectorColor} strokeWidth={selected ? "6" : "2"} markerEnd={`url(#${markerId})`} />
               </g>
             );
           }
