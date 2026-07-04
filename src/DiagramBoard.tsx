@@ -92,7 +92,7 @@ function displayLabel(label: string) {
 function defaultSize(kind: PrimitiveKind) {
   if (kind === "user") return { width: 124, height: 90, type: "ellipse" as const };
   if (kind === "human-review") return { width: 150, height: 90, type: "ellipse" as const };
-  if (kind === "datastore" || kind === "vector-index") return { width: 88, height: 220, type: "rect" as const };
+  if (kind === "datastore" || kind === "vector-index") return { width: 106, height: 162, type: "rect" as const };
   if (kind === "queue") return { width: 184, height: 64, type: "rect" as const };
   if (kind === "model") return { width: 176, height: 68, type: "rect" as const };
   return { width: 176, height: 64, type: "rect" as const };
@@ -585,24 +585,24 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           if (shape.type === "rect") {
             const labelText = shape.label ? displayLabel(shape.label) : "";
             if (shape.primitive === "datastore") {
-              const visualWidth = 56;
-              const visualHeight = 192;
+              const visualWidth = 67;
+              const visualHeight = 134;
               const visualX = label.x - visualWidth / 2;
-              const visualY = label.y - 102;
+              const visualY = label.y - 73;
               const topY = visualY + 12;
               const bottomY = visualY + visualHeight - 12;
               const ellipseRy = 10;
+              const ellipseRx = visualWidth / 2;
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                   <path
-                    d={`M ${visualX} ${topY} C ${visualX} ${topY - ellipseRy}, ${visualX + visualWidth} ${topY - ellipseRy}, ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY} C ${visualX + visualWidth} ${bottomY + ellipseRy}, ${visualX} ${bottomY + ellipseRy}, ${visualX} ${bottomY} Z`}
+                    d={`M ${visualX} ${topY} A ${ellipseRx} ${ellipseRy} 0 0 1 ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX} ${bottomY} Z`}
                     fill="#ffffff"
                     stroke={componentColor}
                     strokeWidth={strokeWidth}
                   />
-                  <ellipse cx={label.x} cy={topY} rx={visualWidth / 2} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  <path d={`M ${visualX} ${bottomY} C ${visualX} ${bottomY + ellipseRy}, ${visualX + visualWidth} ${bottomY + ellipseRy}, ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
-                  <path d={`M ${visualX + 8} ${label.y} C ${visualX + 18} ${label.y + 6}, ${visualX + visualWidth - 18} ${label.y + 6}, ${visualX + visualWidth - 8} ${label.y}`} fill="none" opacity="0.75" stroke={componentColor} strokeLinecap="round" strokeWidth="1.5" />
+                  <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
                   {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
@@ -632,36 +632,35 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             }
 
             if (shape.primitive === "vector-index") {
-              const visualWidth = 56;
-              const visualHeight = 192;
+              const visualWidth = 67;
+              const visualHeight = 134;
               const visualX = label.x - visualWidth / 2;
-              const visualY = label.y - 102;
+              const visualY = label.y - 73;
               const topY = visualY + 12;
               const bottomY = visualY + visualHeight - 12;
               const ellipseRy = 10;
+              const ellipseRx = visualWidth / 2;
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                   <path
-                    d={`M ${visualX} ${topY} C ${visualX} ${topY - ellipseRy}, ${visualX + visualWidth} ${topY - ellipseRy}, ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY} C ${visualX + visualWidth} ${bottomY + ellipseRy}, ${visualX} ${bottomY + ellipseRy}, ${visualX} ${bottomY} Z`}
+                    d={`M ${visualX} ${topY} A ${ellipseRx} ${ellipseRy} 0 0 1 ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX} ${bottomY} Z`}
                     fill="#ffffff"
                     stroke={componentColor}
                     strokeWidth={strokeWidth}
                   />
-                  <ellipse cx={label.x} cy={topY} rx={visualWidth / 2} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  <path d={`M ${visualX} ${bottomY} C ${visualX} ${bottomY + ellipseRy}, ${visualX + visualWidth} ${bottomY + ellipseRy}, ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
+                  <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
                   {shape.indexKind === "text" ? (
                     <>
-                      <rect x={label.x - 15} y={label.y - 13} width="30" height="28" rx="3" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
-                      <line x1={label.x - 8} y1={label.y - 4} x2={label.x + 8} y2={label.y - 4} stroke={componentColor} strokeLinecap="round" strokeWidth="1.5" />
-                      <line x1={label.x - 8} y1={label.y + 3} x2={label.x + 6} y2={label.y + 3} stroke={componentColor} strokeLinecap="round" strokeWidth="1.5" />
-                      <line x1={label.x - 8} y1={label.y + 10} x2={label.x + 2} y2={label.y + 10} stroke={componentColor} strokeLinecap="round" strokeWidth="1.5" />
+                      <circle cx={visualX + visualWidth - 7} cy={topY - 12} r="7" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
+                      <line x1={visualX + visualWidth - 2} y1={topY - 7} x2={visualX + visualWidth + 5} y2={topY} stroke={componentColor} strokeLinecap="round" strokeWidth="2" />
                     </>
                   ) : (
                     <>
-                      <circle cx={label.x - 12} cy={label.y - 6} r="3.5" fill={componentColor} />
-                      <circle cx={label.x + 10} cy={label.y - 1} r="3.5" fill={componentColor} />
-                      <circle cx={label.x - 2} cy={label.y + 13} r="3.5" fill={componentColor} />
-                      <path d={`M ${label.x - 8.5} ${label.y - 5} L ${label.x + 6.5} ${label.y - 1.8} L ${label.x + 0.2} ${label.y + 9.8}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+                      <circle cx={visualX + visualWidth - 18} cy={topY - 15} r="3.2" fill={componentColor} />
+                      <circle cx={visualX + visualWidth - 5} cy={topY - 11} r="3.2" fill={componentColor} />
+                      <circle cx={visualX + visualWidth - 13} cy={topY + 1} r="3.2" fill={componentColor} />
+                      <path d={`M ${visualX + visualWidth - 15} ${topY - 14} L ${visualX + visualWidth - 8} ${topY - 12} L ${visualX + visualWidth - 12} ${topY - 2}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
                     </>
                   )}
                   {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
