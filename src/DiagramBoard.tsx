@@ -258,6 +258,32 @@ function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
   };
 }
 
+function refreshConnectedArrow(shape: DiagramShape, shapes: DiagramShape[]) {
+  if (shape.type !== "arrow") return shape;
+  const source = shapes.find((candidate) => candidate.id === shape.sourceId);
+  const target = shapes.find((candidate) => candidate.id === shape.targetId);
+  if (!source || !target) return shape;
+
+  const handles = inferConnectionHandles(source, target);
+  return {
+    ...shape,
+    sourceHandleId: handles.source.id,
+    targetHandleId: handles.target.id,
+    x: handles.source.x,
+    y: handles.source.y,
+    width: handles.target.x - handles.source.x,
+    height: handles.target.y - handles.source.y
+  };
+}
+
+function refreshArrowsForMovedShape(shapes: DiagramShape[], movedShapeId: string) {
+  return shapes.map((shape) => (
+    shape.sourceId === movedShapeId || shape.targetId === movedShapeId
+      ? refreshConnectedArrow(shape, shapes)
+      : shape
+  ));
+}
+
 function labelPosition(shape: DiagramShape, shapes: DiagramShape[]): Point {
   const label = centerOf(shape);
 
@@ -561,10 +587,13 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     const dx = point.x - dragStart.x;
     const dy = point.y - dragStart.y;
     if (dx !== 0 || dy !== 0) didDragRef.current = true;
-    setShapes((currentShapes) => currentShapes.map((shape) => {
-      if (shape.id !== selectedId) return shape;
-      return { ...shape, x: shape.x + dx, y: shape.y + dy };
-    }));
+    setShapes((currentShapes) => {
+      const movedShapes = currentShapes.map((shape) => {
+        if (shape.id !== selectedId) return shape;
+        return { ...shape, x: shape.x + dx, y: shape.y + dy };
+      });
+      return refreshArrowsForMovedShape(movedShapes, selectedId);
+    });
     setDragStart(point);
   }
 
