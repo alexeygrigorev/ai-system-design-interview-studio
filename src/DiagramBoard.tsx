@@ -26,7 +26,7 @@ interface DiagramBoardProps {
 
 const componentColor = "#2563eb";
 const noteColor = "#d97706";
-const connectorColor = "#94a3b8";
+const connectorColor = componentColor;
 const selectedConnectorColor = "#111827";
 const handleColor = "#0f766e";
 const shapeLabelSize = 14;
