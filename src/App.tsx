@@ -103,9 +103,7 @@ Let's begin. What would you ask or establish first?`;
 }
 
 function openingPlaceholder(topic: string) {
-  return `Problem: ${topic}
-
-Generating scenario details, constraints, and examples...`;
+  return `Problem: ${topic}`;
 }
 
 function replaceLastAssistantMessage(messages: ChatMessage[], content: string): ChatMessage[] {
@@ -226,6 +224,7 @@ function App() {
   const [answer, setAnswer] = useState(persistedState.answer ?? "");
   const [shapes, setShapes] = useState<DiagramShape[]>(persistedState.shapes ?? []);
   const [busy, setBusy] = useState(false);
+  const [preparingOpening, setPreparingOpening] = useState(false);
   const [error, setError] = useState("");
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [screen, setScreen] = useState<"setup" | "interview">(persistedState.screen ?? "setup");
@@ -366,6 +365,7 @@ function App() {
     setActiveBrief(undefined);
     setActiveConstraints([]);
     setBusy(true);
+    setPreparingOpening(true);
     setError("");
     setMessages([{ role: "assistant", content: openingPlaceholder(resolvedTopic) }]);
     setShapes([]);
@@ -380,7 +380,7 @@ function App() {
       setActiveTopic(brief.problem);
       setActiveBrief(brief);
       setActiveConstraints(brief.constraints);
-      const chunkSize = Math.max(24, Math.ceil(opening.length / 24));
+      const chunkSize = Math.max(18, Math.ceil(opening.length / 32));
       for (let length = chunkSize; length < opening.length; length += chunkSize) {
         setMessages((currentMessages) => replaceLastAssistantMessage(currentMessages, opening.slice(0, length)));
         await wait(18);
@@ -389,6 +389,7 @@ function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not prepare interview brief");
     } finally {
+      setPreparingOpening(false);
       setBusy(false);
     }
   }
@@ -648,7 +649,7 @@ function App() {
               type="button"
             >
               <FileText size={15} />
-              AI text
+              Diagram text
             </button>
           </div>
         </div>
@@ -671,7 +672,21 @@ function App() {
                 </span>
                 <div className="message-role">{message.role === "assistant" ? "Interviewer" : "Candidate"}</div>
               </div>
+              {preparingOpening && message.role === "assistant" && index === 0 && (
+                <div className="opening-loading">
+                  <span className="opening-spinner"><Loader2 className="spin" size={14} /></span>
+                  <span>Generating problem details</span>
+                  <span className="loading-dots" aria-hidden="true"><span /> <span /> <span /></span>
+                </div>
+              )}
               <p>{message.content || (busy && index === messages.length - 1 ? "..." : "")}</p>
+              {preparingOpening && message.role === "assistant" && index === 0 && message.content === openingPlaceholder(activeTopic) && (
+                <div className="opening-skeleton" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
             </article>
           ))}
         </div>

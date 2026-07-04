@@ -709,6 +709,76 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+.opening-loading {
+  align-items: center;
+  background: #eef4ff;
+  border: 1px solid #dce6ff;
+  border-radius: 6px;
+  color: #334155;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 7px;
+  margin-bottom: 9px;
+  padding: 6px 8px;
+}
+
+.opening-spinner {
+  align-items: center;
+  color: #5262d6;
+  display: inline-flex;
+}
+
+.loading-dots {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.loading-dots span {
+  animation: pulse-dot 1s ease-in-out infinite;
+  background: #5262d6;
+  border-radius: 999px;
+  height: 4px;
+  opacity: 0.35;
+  width: 4px;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+.opening-skeleton {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.opening-skeleton span {
+  animation: shimmer 1.15s linear infinite;
+  background: linear-gradient(90deg, #e8eef7 0%, #f5f7fb 45%, #e8eef7 90%);
+  background-size: 220% 100%;
+  border-radius: 999px;
+  display: block;
+  height: 9px;
+}
+
+.opening-skeleton span:nth-child(1) {
+  width: 92%;
+}
+
+.opening-skeleton span:nth-child(2) {
+  width: 76%;
+}
+
+.opening-skeleton span:nth-child(3) {
+  width: 58%;
+}
+
 .answer-box {
   border-top: 1px solid #e1e7f0;
   display: grid;
@@ -724,6 +794,19 @@ button:disabled {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-dot {
+  50% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -220% 0;
   }
 }
 
