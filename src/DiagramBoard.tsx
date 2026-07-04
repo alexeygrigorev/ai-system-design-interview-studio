@@ -3,7 +3,9 @@ import {
   Cpu,
   Database,
   Layers3,
+  Minus,
   MousePointer2,
+  Plus,
   Redo2,
   Search,
   Server,
@@ -32,6 +34,8 @@ const connectorColor = componentColor;
 const handleColor = "#0f766e";
 const shapeLabelSize = 16;
 const shapeLabelWeight = 500;
+const minZoom = 0.5;
+const maxZoom = 2;
 
 const componentKinds: Array<{ kind: PrimitiveKind; label: string; icon: typeof Server }> = [
   { kind: "generic", label: "Component", icon: Box },
@@ -275,6 +279,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
   const [canvasViewBox, setCanvasViewBox] = useState({ width: 1200, height: 760 });
+  const [zoom, setZoom] = useState(1);
   const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
   const [redoStack, setRedoStack] = useState<DiagramShape[][]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -291,6 +296,16 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const canvasClass = useMemo(() => (
     tool === "select" ? "drawing-surface selecting" : "drawing-surface"
   ), [tool]);
+  const zoomedViewBox = useMemo(() => {
+    const width = canvasViewBox.width / zoom;
+    const height = canvasViewBox.height / zoom;
+    return {
+      x: (canvasViewBox.width - width) / 2,
+      y: (canvasViewBox.height - height) / 2,
+      width,
+      height
+    };
+  }, [canvasViewBox, zoom]);
 
   function toCanvasPoint(event: { clientX: number; clientY: number }) {
     const svg = svgRef.current;
@@ -311,6 +326,12 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     svgPoint.y = point.y;
     const transformed = svgPoint.matrixTransform(matrix);
     return { x: transformed.x, y: transformed.y };
+  }
+
+  function toViewportFontSize() {
+    const matrix = svgRef.current?.getScreenCTM();
+    if (!matrix) return shapeLabelSize;
+    return Math.max(11, Math.round(shapeLabelSize * Math.abs(matrix.d) * 10) / 10);
   }
 
   function rememberHistory(previousShapes: DiagramShape[]) {
@@ -519,6 +540,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setContextMenu(null);
   }
 
+  function changeZoom(delta: number) {
+    setZoom((current) => Math.min(maxZoom, Math.max(minZoom, Math.round((current + delta) * 10) / 10)));
+  }
+
   function deleteSelected() {
     if (!selectedId) return;
     commitShapes((currentShapes) => currentShapes.filter((shape) => (
@@ -706,6 +731,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   }, []);
 
   const editorPosition = editingShape ? toViewportPoint(labelPosition(editingShape, shapes)) : null;
+  const editorFontSize = editingShape ? toViewportFontSize() : shapeLabelSize;
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
   return (
@@ -725,6 +751,15 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         </div>
         {sessionControls && <div className="canvas-session-controls">{sessionControls}</div>}
         <div className="tool-actions">
+          <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
+            <Minus size={18} />
+          </button>
+          <button className="zoom-button" onClick={() => setZoom(1)} title="Reset zoom" type="button">
+            {Math.round(zoom * 100)}%
+          </button>
+          <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
+            <Plus size={18} />
+          </button>
           <button className="icon-button" onClick={undo} disabled={!undoStack.length} title="Undo" type="button">
             <Undo2 size={18} />
           </button>
@@ -740,7 +775,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       <svg
         ref={svgRef}
         className={canvasClass}
-        viewBox={`0 0 ${canvasViewBox.width} ${canvasViewBox.height}`}
+        viewBox={`${zoomedViewBox.x} ${zoomedViewBox.y} ${zoomedViewBox.width} ${zoomedViewBox.height}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -755,7 +790,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
           </marker>
         </defs>
-        <rect width={canvasViewBox.width} height={canvasViewBox.height} fill="url(#grid)" />
+        <rect x={zoomedViewBox.x} y={zoomedViewBox.y} width={zoomedViewBox.width} height={zoomedViewBox.height} fill="url(#grid)" />
         {connectorDrag && (
           <line
             x1={connectorDrag.start.x}
@@ -918,7 +953,6 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             if (shape.primitive === "user") {
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
-                  {selected && <rect x={shape.x + 12} y={shape.y + 6} width={shape.width - 24} height={shape.height - 14} rx="8" fill="none" stroke={componentColor} strokeDasharray="5 5" strokeWidth="2" />}
                   <circle cx={label.x} cy={shape.y + 24} r="12" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
                   <path d={`M ${label.x - 24} ${shape.y + 59} C ${label.x - 16} ${shape.y + 42}, ${label.x + 16} ${shape.y + 42}, ${label.x + 24} ${shape.y + 59}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
                   {shape.label && <text x={label.x} y={shape.y + shape.height - 8} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
@@ -1034,7 +1068,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             if (event.key === "Enter") commitEditing();
             if (event.key === "Escape") cancelEditing();
           }}
-          style={{ left: editorPosition.x, top: editorPosition.y }}
+          style={{ fontSize: editorFontSize, left: editorPosition.x, top: editorPosition.y }}
           aria-label="Edit component title"
         />
       )}

@@ -288,6 +288,23 @@ button:disabled {
   color: #3546b6;
 }
 
+.zoom-button {
+  background: #f8f9fc;
+  border: 1px solid #dce2ec;
+  border-radius: 6px;
+  color: #374151;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  height: 34px;
+  min-width: 50px;
+  padding: 0 8px;
+}
+
+.zoom-button:hover {
+  background: #f1f4fa;
+}
+
 .icon-button.danger {
   color: #b91c1c;
 }
