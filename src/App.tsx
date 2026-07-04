@@ -1,4 +1,4 @@
-import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
+import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, Redo2, RotateCcw, Send, Trash2, Undo2, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -583,8 +583,14 @@ function App() {
         <DiagramBoard
           shapes={shapes}
           setShapes={setShapes}
-          sessionControls={(
+          sessionControls={({ canRedo, canUndo, clearCanvas, redo, undo }) => (
             <>
+              <button className="icon-button" onClick={undo} disabled={!canUndo} title="Undo" type="button">
+                <Undo2 size={18} />
+              </button>
+              <button className="icon-button" onClick={redo} disabled={!canRedo} title="Redo" type="button">
+                <Redo2 size={18} />
+              </button>
               <span className="timer-pill">{formatTimer(remainingSeconds)}</span>
               <details className="session-menu" ref={sessionMenuRef}>
                 <summary aria-label="Session actions">
@@ -606,6 +612,10 @@ function App() {
                   <button onClick={saveDiagramSvg} type="button">
                     <Download size={16} />
                     Save SVG
+                  </button>
+                  <button className="danger" onClick={() => { closeSessionMenu(); clearCanvas(); }} type="button">
+                    <Trash2 size={16} />
+                    Clear canvas
                   </button>
                 </div>
               </details>

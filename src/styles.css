@@ -350,7 +350,7 @@ button:disabled {
 
 .board-toolbar {
   border-bottom: 1px solid #e3e7ef;
-  gap: 12px;
+  gap: 10px;
   justify-content: space-between;
   overflow: visible;
   padding: 10px;
@@ -360,11 +360,14 @@ button:disabled {
 
 .tool-strip,
 .component-toolbar,
-.canvas-session-controls,
-.tool-actions {
+.canvas-session-controls {
   flex: 0 0 auto;
   flex-wrap: nowrap;
   gap: 6px;
+}
+
+.tool-strip {
+  padding-right: 4px;
 }
 
 .tool-button,
@@ -385,8 +388,10 @@ button:disabled {
 }
 
 .component-toolbar {
+  border-left: 1px solid #e3e7ef;
   display: flex;
   gap: 7px;
+  padding-left: 10px;
 }
 
 .component-chip {
@@ -399,7 +404,9 @@ button:disabled {
 .canvas-session-controls {
   align-items: center;
   display: flex;
+  gap: 8px;
   margin-left: auto;
+  padding-left: 14px;
 }
 
 .icon-button {
@@ -443,6 +450,21 @@ button:disabled {
 
 .zoom-button:hover {
   background: #f1f4fa;
+}
+
+.canvas-zoom-controls {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #dce2ec;
+  border-radius: 7px;
+  bottom: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  position: absolute;
+  right: 14px;
+  z-index: 15;
 }
 
 .icon-button.danger {
@@ -585,6 +607,14 @@ button:disabled {
 
 .session-menu-content button:hover {
   background: #f4f6fa;
+}
+
+.session-menu-content button.danger {
+  color: #b91c1c;
+}
+
+.session-menu-content button.danger:hover {
+  background: #fef2f2;
 }
 
 .canvas-context-menu {

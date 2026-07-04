@@ -6,12 +6,10 @@ import {
   Minus,
   MousePointer2,
   Plus,
-  Redo2,
   Search,
   Server,
   StickyNote,
   Trash2,
-  Undo2,
   UserCheck,
   UserRound,
   Wrench
@@ -23,7 +21,13 @@ import type { DiagramShape, Point, PrimitiveKind, Tool } from "./types";
 interface DiagramBoardProps {
   shapes: DiagramShape[];
   setShapes: Dispatch<SetStateAction<DiagramShape[]>>;
-  sessionControls?: ReactNode;
+  sessionControls?: (actions: {
+    canRedo: boolean;
+    canUndo: boolean;
+    clearCanvas: () => void;
+    redo: () => void;
+    undo: () => void;
+  }) => ReactNode;
 }
 
 type ConnectionHandle = { id: string; x: number; y: number };
@@ -866,27 +870,29 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             </button>
           ))}
         </div>
-        <div className="tool-actions">
-          <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
-            <Minus size={18} />
-          </button>
-          <button className="zoom-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset zoom" type="button">
-            {Math.round(zoom * 100)}%
-          </button>
-          <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
-            <Plus size={18} />
-          </button>
-          <button className="icon-button" onClick={undo} disabled={!undoStack.length} title="Undo" type="button">
-            <Undo2 size={18} />
-          </button>
-          <button className="icon-button" onClick={redo} disabled={!redoStack.length} title="Redo" type="button">
-            <Redo2 size={18} />
-          </button>
-          <button className="icon-button danger" onClick={clearShapes} title="Clear" type="button">
-            <Trash2 size={18} />
-          </button>
-        </div>
-        {sessionControls && <div className="canvas-session-controls">{sessionControls}</div>}
+        {sessionControls && (
+          <div className="canvas-session-controls">
+            {sessionControls({
+              canRedo: redoStack.length > 0,
+              canUndo: undoStack.length > 0,
+              clearCanvas: clearShapes,
+              redo,
+              undo
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="canvas-zoom-controls" aria-label="Canvas zoom controls">
+        <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
+          <Minus size={18} />
+        </button>
+        <button className="zoom-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset zoom" type="button">
+          {Math.round(zoom * 100)}%
+        </button>
+        <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
+          <Plus size={18} />
+        </button>
       </div>
 
       <svg
