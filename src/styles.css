@@ -1,0 +1,419 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #eef2f7;
+  color: #162033;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 320px minmax(460px, 1fr) 390px;
+  min-height: 100vh;
+}
+
+.setup-panel,
+.interview-panel {
+  background: #ffffff;
+  border-color: #d9e0eb;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.setup-panel {
+  border-right: 1px solid #d9e0eb;
+}
+
+.interview-panel {
+  border-left: 1px solid #d9e0eb;
+}
+
+.brand-row,
+.panel-heading,
+.action-row,
+.board-toolbar,
+.tool-strip,
+.swatches,
+.tool-actions,
+.gate-list span {
+  display: flex;
+  align-items: center;
+}
+
+.brand-row {
+  gap: 12px;
+}
+
+.brand-mark {
+  align-items: center;
+  background: #111827;
+  border-radius: 8px;
+  color: #f8fafc;
+  display: flex;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 19px;
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+p {
+  color: #637083;
+  line-height: 1.45;
+}
+
+label {
+  color: #344154;
+  display: grid;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 7px;
+}
+
+select,
+textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  color: #172033;
+  outline: none;
+  padding: 10px 11px;
+  width: 100%;
+}
+
+textarea {
+  line-height: 1.45;
+  resize: vertical;
+}
+
+select:focus,
+textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.field-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.action-row {
+  gap: 10px;
+}
+
+.primary-button,
+.secondary-button,
+.assess-button {
+  align-items: center;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 13px;
+}
+
+.primary-button {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.secondary-button {
+  background: #e7edf5;
+  color: #243045;
+}
+
+.assess-button {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.compact-section {
+  display: grid;
+  gap: 10px;
+}
+
+.phase-list,
+.gate-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.phase-list span,
+.gate-list span {
+  background: #f4f6fa;
+  border: 1px solid #dfe6f0;
+  border-radius: 6px;
+  color: #445168;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.gate-list span {
+  gap: 5px;
+}
+
+.workspace {
+  min-width: 0;
+  padding: 18px;
+}
+
+.board-panel {
+  background: #ffffff;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  display: grid;
+  grid-template-rows: auto minmax(420px, 1fr);
+  height: calc(100vh - 36px);
+  overflow: hidden;
+}
+
+.board-toolbar {
+  border-bottom: 1px solid #e0e6ef;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.tool-strip,
+.swatches,
+.tool-actions {
+  gap: 6px;
+}
+
+.icon-button {
+  align-items: center;
+  background: #f4f6fa;
+  border: 1px solid #dbe3ee;
+  border-radius: 7px;
+  color: #263245;
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+}
+
+.icon-button.active {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.icon-button.danger {
+  color: #b91c1c;
+}
+
+.swatch {
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px #cbd5e1;
+  cursor: pointer;
+  height: 24px;
+  padding: 0;
+  width: 24px;
+}
+
+.swatch.active {
+  box-shadow: 0 0 0 2px #111827;
+}
+
+.drawing-surface {
+  cursor: crosshair;
+  height: 100%;
+  touch-action: none;
+  width: 100%;
+}
+
+.panel-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.transcript {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 280px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.empty-state,
+.error-box,
+.thinking {
+  border-radius: 7px;
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.empty-state {
+  background: #f3f7fb;
+  color: #526174;
+}
+
+.error-box {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.thinking {
+  align-items: center;
+  background: #ecfeff;
+  color: #155e75;
+  display: flex;
+  gap: 8px;
+}
+
+.message {
+  border: 1px solid #e0e6ef;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.message.assistant {
+  background: #f8fafc;
+}
+
+.message.user {
+  background: #fffaf0;
+  border-color: #f4d89b;
+}
+
+.message-role {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.message p {
+  color: #1f2937;
+  white-space: pre-wrap;
+}
+
+.answer-box {
+  border-top: 1px solid #e1e7f0;
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.assessment {
+  border-top: 1px solid #e1e7f0;
+  display: grid;
+  gap: 10px;
+  max-height: 280px;
+  overflow: auto;
+  padding-top: 14px;
+}
+
+.assessment pre {
+  background: #111827;
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 280px minmax(360px, 1fr);
+  }
+
+  .interview-panel {
+    border-left: 0;
+    border-top: 1px solid #d9e0eb;
+    grid-column: 1 / -1;
+    min-height: 560px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
+  }
+
+  .setup-panel,
+  .interview-panel {
+    min-height: auto;
+  }
+
+  .setup-panel {
+    border-right: 0;
+    border-bottom: 1px solid #d9e0eb;
+  }
+
+  .workspace {
+    padding: 12px;
+  }
+
+  .board-panel {
+    height: 72vh;
+  }
+
+  .board-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
