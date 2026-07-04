@@ -333,6 +333,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     if (!source) return;
     const sourceHandle = connectionHandleById(source, sourceHandleId) ?? nearestConnectionHandle(source, centerOf(target));
     const targetHandle = nearestConnectionHandle(target, targetPoint);
+    const label = window.prompt("Add a note for this arrow?")?.trim();
     const next: DiagramShape = {
       id: crypto.randomUUID(),
       type: "arrow",
@@ -344,7 +345,8 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       sourceId: source.id,
       targetId: target.id,
       sourceHandleId: sourceHandle.id,
-      targetHandleId: targetHandle.id
+      targetHandleId: targetHandle.id,
+      label: label || undefined
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(source.id);
@@ -353,7 +355,6 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   }
 
   function openEditor(shape: DiagramShape) {
-    if (shape.type === "arrow") return;
     setSelectedId(shape.id);
     setContextMenu(null);
     skipNextEditCommitRef.current = false;
@@ -511,7 +512,6 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   }
 
   function startEditing(event: React.MouseEvent<SVGGElement>, shape: DiagramShape) {
-    if (shape.type === "arrow") return;
     event.stopPropagation();
     openEditor(shape);
   }
@@ -523,11 +523,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     }
     if (!editingId) return;
     const nextLabel = editingLabel.trim();
-    if (nextLabel) {
-      commitShapes((currentShapes) => currentShapes.map((shape) => (
-        shape.id === editingId ? { ...shape, label: nextLabel } : shape
-      )));
-    }
+    commitShapes((currentShapes) => currentShapes.map((shape) => (
+      shape.id === editingId ? { ...shape, label: nextLabel || undefined } : shape
+    )));
     skipNextEditCommitRef.current = true;
     setEditingId(null);
     setEditingLabel("");
@@ -661,7 +659,17 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     };
   }, []);
 
-  const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
+  const editorPosition = editingShape
+    ? toViewportPoint(editingShape.type === "arrow"
+      ? (() => {
+        const endpoints = connectorEndpoints(editingShape, shapes);
+        return {
+          x: (endpoints.start.x + endpoints.end.x) / 2,
+          y: (endpoints.start.y + endpoints.end.y) / 2
+        };
+      })()
+      : centerOf(editingShape))
+    : null;
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
   return (
@@ -909,8 +917,13 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           if (shape.type === "arrow") {
             const markerId = `arrowhead-${shape.id}`;
             const endpoints = connectorEndpoints(shape, shapes);
+            const midpoint = {
+              x: (endpoints.start.x + endpoints.end.x) / 2,
+              y: (endpoints.start.y + endpoints.end.y) / 2
+            };
+            const labelText = shape.label ? displayLabel(shape.label) : "";
             return (
-              <g key={shape.id}>
+              <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                 <defs>
                   <marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
                     <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
@@ -918,6 +931,12 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
                 <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth="2" markerEnd={`url(#${markerId})`} />
+                {shape.label && (
+                  <text x={midpoint.x} y={midpoint.y - 7} textAnchor="middle" fill="#1f2937" fontSize="12" fontWeight="500" paintOrder="stroke" stroke="#ffffff" strokeLinejoin="round" strokeWidth="5">
+                    <title>{shape.label}</title>
+                    {labelText}
+                  </text>
+                )}
               </g>
             );
           }
