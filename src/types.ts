@@ -17,6 +17,7 @@ export interface ChatMessage {
 }
 
 export type Tool = "select" | "rect" | "ellipse" | "note" | "arrow" | "line" | "freehand";
+export type PrimitiveKind = "service" | "datastore" | "queue" | "vector-index" | "model" | "tool" | "human-review";
 
 export interface Point {
   x: number;
@@ -26,6 +27,7 @@ export interface Point {
 export interface DiagramShape {
   id: string;
   type: Exclude<Tool, "select">;
+  primitive?: PrimitiveKind;
   x: number;
   y: number;
   width: number;

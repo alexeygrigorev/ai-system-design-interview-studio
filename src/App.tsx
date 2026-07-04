@@ -1,6 +1,6 @@
-import { Bot, CheckCircle2, Loader2, Play, RotateCcw, Send, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
-import { requestAssessment, requestInterviewTurn } from "./api";
+import { AlertCircle, Bot, CheckCircle2, Loader2, Play, RotateCcw, Send, Sparkles, Wifi } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { getHealth, requestAssessment, requestInterviewTurn, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
 import { phaseGuide, processGates, topicBank } from "./questionBank";
 import type { CandidateLevel, ChatMessage, DiagramShape, FeedbackMode, Persona, SessionConfig } from "./types";
@@ -24,6 +24,7 @@ function App() {
   const [shapes, setShapes] = useState<DiagramShape[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [health, setHealth] = useState<HealthStatus | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
@@ -37,11 +38,70 @@ function App() {
       .filter(Boolean)
   }), [constraintText, duration, feedbackMode, level, persona, topic]);
 
+  const providerReady = Boolean(health?.ok && health.ready);
+  const providerStatusClass = !health
+    ? "provider-status checking"
+    : providerReady
+      ? "provider-status ready"
+      : health.ok
+        ? "provider-status missing"
+        : "provider-status failure";
+  const providerStatusText = !health
+    ? "Checking Z.AI status"
+    : providerReady
+      ? `Z.AI ready: ${health.model}`
+      : health.ok
+        ? "Z.AI key missing"
+        : "Z.AI health check failed";
+
+  function missingProviderMessage(forAssessment = false) {
+    if (!health) return "Still checking AI interviewer provider status. Try again in a moment.";
+    if (!health.ok) return "The app health endpoint is unavailable. Check the dev server and reload the page.";
+    if (!health.zaiConfigured) {
+      return forAssessment
+        ? "ZAI_API_KEY is not configured. Final assessment needs the Z.AI interviewer provider."
+        : "ZAI_API_KEY is not configured. Add it to .env and restart the dev server to use the AI interviewer.";
+    }
+    return "";
+  }
+
+  function refreshHealth(active: () => boolean) {
+    getHealth()
+      .then((status) => {
+        if (active()) setHealth(status);
+      })
+      .catch(() => {
+        if (active()) {
+          setHealth({
+            ok: false,
+            provider: "zai",
+            model: "unknown",
+            zaiConfigured: false,
+            ready: false
+          });
+        }
+      });
+  }
+
+  useEffect(() => {
+    let active = true;
+    refreshHealth(() => active);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function startInterview() {
     setBusy(true);
     setError("");
     setAssessment("");
     setMessages([]);
+    const providerError = missingProviderMessage();
+    if (providerError) {
+      setError(providerError);
+      setBusy(false);
+      return;
+    }
     try {
       const { reply } = await requestInterviewTurn(session, [], shapes);
       setMessages([{ role: "assistant", content: reply }]);
@@ -54,7 +114,12 @@ function App() {
 
   async function sendAnswer() {
     const trimmed = answer.trim();
-    if (!trimmed || busy) return;
+    if (!trimmed || busy || messages.length === 0) return;
+    const providerError = missingProviderMessage();
+    if (providerError) {
+      setError(providerError);
+      return;
+    }
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
     setAnswer("");
     setMessages(nextMessages);
@@ -72,6 +137,11 @@ function App() {
 
   async function finishInterview() {
     if (messages.length === 0 || busy) return;
+    const providerError = missingProviderMessage(true);
+    if (providerError) {
+      setError(providerError);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -100,6 +170,11 @@ function App() {
             <h1>AI System Design Trainer</h1>
             <p>Practice production AI architecture interviews.</p>
           </div>
+        </div>
+
+        <div className={providerStatusClass}>
+          {providerReady ? <Wifi size={16} /> : health ? <AlertCircle size={16} /> : <Loader2 className="spin" size={16} />}
+          <span>{providerStatusText}</span>
         </div>
 
         <label>
@@ -201,7 +276,7 @@ function App() {
         <div className="transcript">
           {messages.length === 0 && (
             <div className="empty-state">
-              Choose a topic, draw while you think, and answer one interviewer question at a time.
+              Choose a topic, add system components on the canvas, then start the AI interviewer.
             </div>
           )}
           {messages.map((message, index) => (
@@ -225,7 +300,7 @@ function App() {
               }
             }}
           />
-          <button className="primary-button" onClick={sendAnswer} disabled={busy || !answer.trim()} type="button">
+          <button className="primary-button" onClick={sendAnswer} disabled={busy || messages.length === 0 || !answer.trim()} type="button">
             <Send size={17} />
             Send
           </button>

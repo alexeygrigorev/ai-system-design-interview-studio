@@ -1,5 +1,21 @@
 import type { ChatMessage, DiagramShape, SessionConfig } from "./types";
 
+export interface HealthStatus {
+  ok: boolean;
+  provider: string;
+  model: string;
+  zaiConfigured: boolean;
+  ready: boolean;
+}
+
+export async function getHealth() {
+  const response = await fetch("/api/health");
+  if (!response.ok) {
+    throw new Error(`Health check failed with ${response.status}`);
+  }
+  return response.json() as Promise<HealthStatus>;
+}
+
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
