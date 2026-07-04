@@ -371,9 +371,13 @@ function App() {
     }
     const clone = svg.cloneNode(true) as SVGSVGElement;
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.setAttribute("font-family", "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif");
     const rect = svg.getBoundingClientRect();
     clone.setAttribute("width", String(Math.round(rect.width)));
     clone.setAttribute("height", String(Math.round(rect.height)));
+    const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    style.textContent = "text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }";
+    clone.prepend(style);
     downloadTextFile(
       `${filenamePart(activeTopic)}-diagram.svg`,
       `${new XMLSerializer().serializeToString(clone)}\n`,
