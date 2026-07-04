@@ -373,8 +373,6 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
   const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
   const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
-  const activeKind = componentKinds.find((kind) => kind.kind === componentKind) ?? componentKinds[0];
-
   const canvasClass = useMemo(() => (
     [
       "drawing-surface",
@@ -440,24 +438,25 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setContextMenu(null);
   }
 
-  function addComponent(point: Point, screenPoint?: Point) {
-    const size = defaultSize(componentKind);
+  function addComponent(point: Point, screenPoint?: Point, kind: PrimitiveKind = componentKind) {
+    const size = defaultSize(kind);
+    const activeKind = componentKinds.find((component) => component.kind === kind) ?? componentKinds[0];
     const next: DiagramShape = {
       id: crypto.randomUUID(),
       type: size.type,
-      primitive: componentKind,
+      primitive: kind,
       x: point.x - size.width / 2,
       y: point.y - size.height / 2,
       width: size.width,
       height: size.height,
       color: componentColor,
       label: activeKind.label,
-      indexKind: componentKind === "vector-index" ? "vector" : undefined
+      indexKind: kind === "vector-index" ? "vector" : undefined
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(next.id);
     setTool("select");
-    if (componentKind === "vector-index" && screenPoint) {
+    if (kind === "vector-index" && screenPoint) {
       setIndexChooser({ x: screenPoint.x, y: screenPoint.y, shapeId: next.id });
     } else {
       setIndexChooser(null);
@@ -731,6 +730,15 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setIndexChooser(null);
   }
 
+  function onCanvasDoubleClick(event: React.MouseEvent<SVGSVGElement>) {
+    const point = toCanvasPoint(event);
+    const hit = findShapeAt(shapes, point) ?? findLabelAt(shapes, point);
+    const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
+    if (hit || connectorHit || tool !== "select") return;
+    event.preventDefault();
+    addComponent(point, undefined, "generic");
+  }
+
   function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: ConnectionHandle) {
     event.stopPropagation();
     setSelectedId(sourceId);
@@ -888,6 +896,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onDoubleClick={onCanvasDoubleClick}
         onContextMenu={onContextMenu}
         preserveAspectRatio="none"
       >
