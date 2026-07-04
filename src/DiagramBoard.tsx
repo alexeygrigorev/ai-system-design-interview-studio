@@ -98,6 +98,54 @@ function defaultSize(kind: PrimitiveKind) {
   return { width: 176, height: 64, type: "rect" as const };
 }
 
+function visualShapeBounds(shape: DiagramShape) {
+  const bounds = shapeBounds(shape);
+  const label = centerOf(shape);
+
+  if (shape.primitive === "datastore" || shape.primitive === "vector-index") {
+    const visualWidth = 67;
+    const visualHeight = 101;
+    const visualX = label.x - visualWidth / 2;
+    const visualY = label.y - 56.5;
+    if (shape.primitive === "vector-index") {
+      return {
+        x: visualX,
+        y: visualY - 8,
+        width: visualWidth + 8,
+        height: visualHeight + 8
+      };
+    }
+    return {
+      x: visualX,
+      y: visualY,
+      width: visualWidth,
+      height: visualHeight
+    };
+  }
+
+  if (shape.primitive === "queue") {
+    const tubeHeight = Math.max(18, Math.min(34, shape.height - 22));
+    const tubeWidth = Math.min(shape.width - 16, 150);
+    return {
+      x: label.x - tubeWidth / 2,
+      y: shape.y + 10,
+      width: tubeWidth,
+      height: tubeHeight
+    };
+  }
+
+  if (shape.primitive === "user") {
+    return {
+      x: label.x - 28,
+      y: shape.y + 10,
+      width: 56,
+      height: 58
+    };
+  }
+
+  return bounds;
+}
+
 function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
   const source = shapes.find((candidate) => candidate.id === shape.sourceId);
   const target = shapes.find((candidate) => candidate.id === shape.targetId);
@@ -115,7 +163,7 @@ function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
 }
 
 function connectionHandles(shape: DiagramShape) {
-  const bounds = shapeBounds(shape);
+  const bounds = visualShapeBounds(shape);
   return [
     { id: "top", x: bounds.x + bounds.width / 2, y: bounds.y },
     { id: "right", x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
