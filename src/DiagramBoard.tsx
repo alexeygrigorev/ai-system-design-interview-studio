@@ -468,18 +468,42 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     }
   }
 
-  function addNote(point: Point) {
+  function addNote(point: Point, sourceId?: string) {
+    const source = sourceId ? shapes.find((shape) => shape.id === sourceId) : undefined;
+    const notePoint = source
+      ? { x: shapeBounds(source).x + shapeBounds(source).width + 138, y: centerOf(source).y }
+      : point;
     const next: DiagramShape = {
       id: crypto.randomUUID(),
       type: "note",
-      x: point.x - 100,
-      y: point.y - 44,
+      x: notePoint.x - 100,
+      y: notePoint.y - 44,
       width: 200,
       height: 88,
       color: noteColor,
       label: "Note"
     };
-    commitShapes((currentShapes) => [...currentShapes, next]);
+    const nextShapes = source
+      ? (() => {
+        const sourceHandle = nearestConnectionHandle(source, centerOf(next));
+        const targetHandle = nearestConnectionHandle(next, sourceHandle);
+        const connector: DiagramShape = {
+          id: crypto.randomUUID(),
+          type: "arrow",
+          x: sourceHandle.x,
+          y: sourceHandle.y,
+          width: targetHandle.x - sourceHandle.x,
+          height: targetHandle.y - sourceHandle.y,
+          color: connectorColor,
+          sourceId: source.id,
+          targetId: next.id,
+          sourceHandleId: sourceHandle.id,
+          targetHandleId: targetHandle.id
+        };
+        return [next, connector];
+      })()
+      : [next];
+    commitShapes((currentShapes) => [...currentShapes, ...nextShapes]);
     setSelectedId(next.id);
     setTool("select");
   }
@@ -766,7 +790,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
   function addContextNote() {
     if (!contextMenu) return;
-    addNote(contextMenu.point);
+    addNote(contextMenu.point, contextMenu.shapeId);
     setContextMenu(null);
   }
 
