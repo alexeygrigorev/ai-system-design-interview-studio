@@ -684,7 +684,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#d7dde7" strokeWidth="1" />
           </pattern>
           <marker id="connector-preview-arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-            <path d="M 0 0 L 8 3 L 0 6 z" fill={handleColor} />
+            <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
           </marker>
         </defs>
         <rect width={canvasViewBox.width} height={canvasViewBox.height} fill="url(#grid)" />
@@ -694,9 +694,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             y1={connectorDrag.start.y}
             x2={connectorDrag.current.x}
             y2={connectorDrag.current.y}
-            stroke={handleColor}
+            stroke={connectorColor}
             strokeLinecap="round"
-            strokeWidth="4"
+            strokeWidth="2"
             markerEnd="url(#connector-preview-arrowhead)"
           />
         )}
@@ -706,9 +706,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             y1={reattachDrag.endpoint === "source" ? reattachDrag.current.y : reattachDrag.fixed.y}
             x2={reattachDrag.endpoint === "source" ? reattachDrag.fixed.x : reattachDrag.current.x}
             y2={reattachDrag.endpoint === "source" ? reattachDrag.fixed.y : reattachDrag.current.y}
-            stroke={handleColor}
+            stroke={connectorColor}
             strokeLinecap="round"
-            strokeWidth="4"
+            strokeWidth="2"
             markerEnd="url(#connector-preview-arrowhead)"
           />
         )}
