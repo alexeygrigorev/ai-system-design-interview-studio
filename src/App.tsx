@@ -1,4 +1,4 @@
-import { Bot, Loader2, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
+import { Bot, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -399,7 +399,7 @@ function App() {
             <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
               <div className="message-header">
                 <span className="message-avatar">
-                  {message.role === "assistant" ? <Bot size={15} /> : <User size={15} />}
+                  {message.role === "assistant" ? <MessagesSquare size={15} /> : <User size={15} />}
                 </span>
                 <div className="message-role">{message.role === "assistant" ? "Interviewer" : "Candidate"}</div>
               </div>

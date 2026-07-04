@@ -25,7 +25,7 @@ export interface ChatMessage {
 }
 
 export type Tool = "select" | "component";
-export type PrimitiveKind = "service" | "datastore" | "queue" | "vector-index" | "model" | "tool" | "human-review";
+export type PrimitiveKind = "generic" | "user" | "service" | "datastore" | "queue" | "vector-index" | "model" | "tool" | "human-review";
 export type ShapeType = "rect" | "ellipse" | "note" | "arrow";
 
 export interface Point {

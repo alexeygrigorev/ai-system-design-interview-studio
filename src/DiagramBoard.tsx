@@ -1,16 +1,18 @@
 import {
-  BrainCircuit,
+  Box,
+  Cpu,
   Database,
-  GitBranch,
-  HardDrive,
-  ListOrdered,
+  Layers3,
   MousePointer2,
   Redo2,
+  Search,
   Server,
   StickyNote,
   Trash2,
   Undo2,
-  UserCheck
+  UserCheck,
+  UserRound,
+  Wrench
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
@@ -28,12 +30,14 @@ const connectorColor = "#4b5563";
 const handleColor = "#0f766e";
 
 const componentKinds: Array<{ kind: PrimitiveKind; label: string; icon: typeof Server }> = [
+  { kind: "generic", label: "Component", icon: Box },
+  { kind: "user", label: "User", icon: UserRound },
   { kind: "service", label: "Service", icon: Server },
   { kind: "datastore", label: "Datastore", icon: Database },
-  { kind: "queue", label: "Queue", icon: ListOrdered },
-  { kind: "vector-index", label: "Vector index", icon: HardDrive },
-  { kind: "model", label: "Model", icon: BrainCircuit },
-  { kind: "tool", label: "Tool", icon: GitBranch },
+  { kind: "queue", label: "Queue", icon: Layers3 },
+  { kind: "vector-index", label: "Vector index", icon: Search },
+  { kind: "model", label: "Model", icon: Cpu },
+  { kind: "tool", label: "Tool", icon: Wrench },
   { kind: "human-review", label: "Human review", icon: UserCheck }
 ];
 
@@ -84,7 +88,10 @@ function displayLabel(label: string) {
 }
 
 function defaultSize(kind: PrimitiveKind) {
-  if (kind === "model" || kind === "human-review") return { width: 190, height: 92, type: "ellipse" as const };
+  if (kind === "user" || kind === "human-review") return { width: 170, height: 104, type: "ellipse" as const };
+  if (kind === "datastore") return { width: 178, height: 112, type: "rect" as const };
+  if (kind === "queue") return { width: 190, height: 104, type: "rect" as const };
+  if (kind === "model") return { width: 184, height: 96, type: "rect" as const };
   return { width: 190, height: 86, type: "rect" as const };
 }
 
@@ -121,13 +128,19 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; start: Point; current: Point } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
   const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
   const [redoStack, setRedoStack] = useState<DiagramShape[][]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const editorRef = useRef<HTMLInputElement | null>(null);
   const dragSnapshotRef = useRef<DiagramShape[] | null>(null);
   const didDragRef = useRef(false);
+  const skipNextEditCommitRef = useRef(false);
+  const lastClickRef = useRef<{ shapeId: string; point: Point; time: number } | null>(null);
 
   const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
+  const editingShape = shapes.find((shape) => shape.id === editingId) ?? null;
   const activeKind = componentKinds.find((kind) => kind.kind === componentKind) ?? componentKinds[0];
 
   const canvasClass = useMemo(() => (
@@ -141,6 +154,17 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     point.x = event.clientX;
     point.y = event.clientY;
     const transformed = point.matrixTransform(svg.getScreenCTM()?.inverse());
+    return { x: transformed.x, y: transformed.y };
+  }
+
+  function toViewportPoint(point: Point) {
+    const svg = svgRef.current;
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !matrix) return null;
+    const svgPoint = svg.createSVGPoint();
+    svgPoint.x = point.x;
+    svgPoint.y = point.y;
+    const transformed = svgPoint.matrixTransform(matrix);
     return { x: transformed.x, y: transformed.y };
   }
 
@@ -220,12 +244,44 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setTool("select");
   }
 
+  function openEditor(shape: DiagramShape) {
+    if (shape.type === "arrow") return;
+    setSelectedId(shape.id);
+    setContextMenu(null);
+    skipNextEditCommitRef.current = false;
+    setEditingId(shape.id);
+    setEditingLabel(shape.label ?? "");
+  }
+
+  function isDoubleClick(hit: DiagramShape | undefined, point: Point) {
+    if (!hit) {
+      lastClickRef.current = null;
+      return false;
+    }
+
+    const now = window.performance.now();
+    const previous = lastClickRef.current;
+    lastClickRef.current = { shapeId: hit.id, point, time: now };
+    if (!previous || previous.shapeId !== hit.id || now - previous.time > 450) return false;
+
+    const dx = point.x - previous.point.x;
+    const dy = point.y - previous.point.y;
+    return Math.hypot(dx, dy) <= 12;
+  }
+
   function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
     const point = toCanvasPoint(event);
     const hit = findShapeAt(shapes, point);
 
     if (tool === "component") {
       addComponent(point);
+      return;
+    }
+
+    if (isDoubleClick(hit, point) && hit) {
+      event.preventDefault();
+      openEditor(hit);
+      setDragStart(null);
       return;
     }
 
@@ -313,6 +369,35 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setTool("select");
   }
 
+  function startEditing(event: React.MouseEvent<SVGGElement>, shape: DiagramShape) {
+    if (shape.type === "arrow") return;
+    event.stopPropagation();
+    openEditor(shape);
+  }
+
+  function commitEditing() {
+    if (skipNextEditCommitRef.current) {
+      skipNextEditCommitRef.current = false;
+      return;
+    }
+    if (!editingId) return;
+    const nextLabel = editingLabel.trim();
+    if (nextLabel) {
+      commitShapes((currentShapes) => currentShapes.map((shape) => (
+        shape.id === editingId ? { ...shape, label: nextLabel } : shape
+      )));
+    }
+    skipNextEditCommitRef.current = true;
+    setEditingId(null);
+    setEditingLabel("");
+  }
+
+  function cancelEditing() {
+    skipNextEditCommitRef.current = true;
+    setEditingId(null);
+    setEditingLabel("");
+  }
+
   function onContextMenu(event: React.MouseEvent<SVGSVGElement>) {
     event.preventDefault();
     const point = toCanvasPoint(event);
@@ -358,6 +443,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         redo();
       }
       if (event.key === "Escape") setContextMenu(null);
+      if (event.key === "Escape") cancelEditing();
     }
 
     function onPointerDown() {
@@ -371,6 +457,14 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       window.removeEventListener("pointerdown", onPointerDown);
     };
   }, [redoStack, selectedId, shapes, undoStack]);
+
+  useEffect(() => {
+    if (!editingId) return;
+    editorRef.current?.focus();
+    editorRef.current?.select();
+  }, [editingId]);
+
+  const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
 
   return (
     <section className="board-panel simple-board" aria-label="Architecture diagram board">
@@ -409,6 +503,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onContextMenu={onContextMenu}
+        preserveAspectRatio="none"
       >
         <defs>
           <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
@@ -429,29 +524,111 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         )}
         {shapes.map((shape) => {
           const selected = shape.id === selectedId;
+          const label = centerOf(shape);
+          const strokeWidth = selected ? "5" : "3";
           if (shape.type === "rect") {
-            const label = centerOf(shape);
+            const labelText = shape.label ? displayLabel(shape.label) : "";
+            if (shape.primitive === "datastore") {
+              const topY = shape.y + 22;
+              const bottomY = shape.y + shape.height - 20;
+              return (
+                <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                  <path
+                    d={`M ${shape.x} ${topY} C ${shape.x} ${shape.y + 6}, ${shape.x + shape.width} ${shape.y + 6}, ${shape.x + shape.width} ${topY} L ${shape.x + shape.width} ${bottomY} C ${shape.x + shape.width} ${shape.y + shape.height - 6}, ${shape.x} ${shape.y + shape.height - 6}, ${shape.x} ${bottomY} Z`}
+                    fill="#ffffff"
+                    stroke={componentColor}
+                    strokeWidth={strokeWidth}
+                  />
+                  <ellipse cx={label.x} cy={topY} rx={shape.width / 2} ry="18" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${shape.x} ${bottomY} C ${shape.x} ${shape.y + shape.height - 6}, ${shape.x + shape.width} ${shape.y + shape.height - 6}, ${shape.x + shape.width} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="2" />
+                  {shape.label && <text x={label.x} y={label.y + 14} textAnchor="middle" fill="#1f2937" fontSize="21" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
+                </g>
+              );
+            }
+
+            if (shape.primitive === "queue") {
+              return (
+                <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                  <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  {[0, 1, 2].map((index) => (
+                    <rect key={index} x={shape.x + 22 + index * 48} y={shape.y + 18} width="38" height="30" rx="5" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
+                  ))}
+                  <path d={`M ${shape.x + 156} ${shape.y + 33} L ${shape.x + 170} ${shape.y + 33}`} stroke={componentColor} strokeLinecap="round" strokeWidth="4" />
+                  <path d={`M ${shape.x + 164} ${shape.y + 25} L ${shape.x + 172} ${shape.y + 33} L ${shape.x + 164} ${shape.y + 41}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+                  {shape.label && <text x={label.x} y={shape.y + shape.height - 22} textAnchor="middle" fill="#1f2937" fontSize="21" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
+                </g>
+              );
+            }
+
+            if (shape.primitive === "vector-index") {
+              return (
+                <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                  <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <circle cx={shape.x + 42} cy={shape.y + 30} r="13" fill="#eef4ff" stroke={componentColor} strokeWidth="3" />
+                  <path d={`M ${shape.x + 52} ${shape.y + 40} L ${shape.x + 66} ${shape.y + 54}`} stroke={componentColor} strokeLinecap="round" strokeWidth="4" />
+                  {[0, 1, 2].map((index) => (
+                    <line key={index} x1={shape.x + 86} y1={shape.y + 23 + index * 14} x2={shape.x + 158} y2={shape.y + 23 + index * 14} stroke={componentColor} strokeLinecap="round" strokeWidth="4" />
+                  ))}
+                  {shape.label && <text x={label.x} y={shape.y + shape.height - 18} textAnchor="middle" fill="#1f2937" fontSize="21" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
+                </g>
+              );
+            }
+
+            if (shape.primitive === "model") {
+              return (
+                <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                  <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <rect x={shape.x + 14} y={shape.y + 12} width="64" height="24" rx="4" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
+                  <text x={shape.x + 46} y={shape.y + 30} textAnchor="middle" fill="#1d4ed8" fontSize="12" fontWeight="700">MODEL</text>
+                  <path d={`M ${shape.x + shape.width - 48} ${shape.y + 20} h 24 m -12 -12 v 24`} stroke={componentColor} strokeLinecap="round" strokeWidth="3" />
+                  {shape.label && <text x={label.x} y={label.y + 16} textAnchor="middle" fill="#1f2937" fontSize="22" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
+                </g>
+              );
+            }
+
+            if (shape.primitive === "service") {
+              return (
+                <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                  <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <rect x={shape.x + 16} y={shape.y + 17} width="36" height="30" rx="4" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
+                  <line x1={shape.x + 62} y1={shape.y + 25} x2={shape.x + shape.width - 22} y2={shape.y + 25} stroke={componentColor} strokeLinecap="round" strokeWidth="4" />
+                  <line x1={shape.x + 62} y1={shape.y + 41} x2={shape.x + shape.width - 54} y2={shape.y + 41} stroke={componentColor} strokeLinecap="round" strokeWidth="4" />
+                  {shape.label && <text x={label.x} y={shape.y + shape.height - 16} textAnchor="middle" fill="#1f2937" fontSize="21" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
+                </g>
+              );
+            }
+
             return (
-              <g key={shape.id}>
-                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={selected ? "5" : "3"} />
-                {shape.label && <text x={label.x} y={label.y + 7} textAnchor="middle" fill="#1f2937" fontSize="22" fontWeight="800"><title>{shape.label}</title>{displayLabel(shape.label)}</text>}
+              <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                {shape.primitive === "tool" && (
+                  <path d={`M ${shape.x + 24} ${shape.y + 26} L ${shape.x + 44} ${shape.y + 46} M ${shape.x + 42} ${shape.y + 22} L ${shape.x + 50} ${shape.y + 30} L ${shape.x + 34} ${shape.y + 46}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+                )}
+                {shape.label && <text x={label.x} y={label.y + 7} textAnchor="middle" fill="#1f2937" fontSize="22" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
               </g>
             );
           }
           if (shape.type === "ellipse") {
-            const label = centerOf(shape);
+            const labelText = shape.label ? displayLabel(shape.label) : "";
             return (
-              <g key={shape.id}>
-                <ellipse cx={label.x} cy={label.y} rx={Math.abs(shape.width / 2)} ry={Math.abs(shape.height / 2)} fill="#ffffff" stroke={componentColor} strokeWidth={selected ? "5" : "3"} />
-                {shape.label && <text x={label.x} y={label.y + 7} textAnchor="middle" fill="#1f2937" fontSize="22" fontWeight="800"><title>{shape.label}</title>{displayLabel(shape.label)}</text>}
+              <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                <ellipse cx={label.x} cy={label.y} rx={Math.abs(shape.width / 2)} ry={Math.abs(shape.height / 2)} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                {(shape.primitive === "user" || shape.primitive === "human-review") && (
+                  <>
+                    <circle cx={label.x} cy={shape.y + 31} r="12" fill="#eef4ff" stroke={componentColor} strokeWidth="3" />
+                    <path d={`M ${label.x - 25} ${shape.y + 66} C ${label.x - 16} ${shape.y + 48}, ${label.x + 16} ${shape.y + 48}, ${label.x + 25} ${shape.y + 66}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeWidth="4" />
+                    {shape.primitive === "human-review" && <path d={`M ${shape.x + shape.width - 47} ${shape.y + 32} L ${shape.x + shape.width - 38} ${shape.y + 41} L ${shape.x + shape.width - 22} ${shape.y + 23}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />}
+                  </>
+                )}
+                {shape.label && <text x={label.x} y={shape.y + shape.height - 18} textAnchor="middle" fill="#1f2937" fontSize="21" fontWeight="650"><title>{shape.label}</title>{labelText}</text>}
               </g>
             );
           }
           if (shape.type === "note") {
             return (
-              <g key={shape.id}>
-                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#fff7d6" stroke={noteColor} strokeWidth={selected ? "5" : "3"} />
-                <text x={shape.x + 14} y={shape.y + 32} fill="#1f2937" fontSize="22" fontWeight="700">
+              <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#fff7d6" stroke={noteColor} strokeWidth={strokeWidth} />
+                <text x={shape.x + 14} y={shape.y + 32} fill="#1f2937" fontSize="22" fontWeight="600">
                   {shape.label && <title>{shape.label}</title>}
                   {shape.label ? displayLabel(shape.label) : ""}
                 </text>
@@ -488,6 +665,21 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           />
         ))}
       </svg>
+      {editingShape && editorPosition && (
+        <input
+          ref={editorRef}
+          className="label-editor"
+          value={editingLabel}
+          onChange={(event) => setEditingLabel(event.target.value)}
+          onBlur={commitEditing}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commitEditing();
+            if (event.key === "Escape") cancelEditing();
+          }}
+          style={{ left: editorPosition.x, top: editorPosition.y }}
+          aria-label="Edit component title"
+        />
+      )}
       {contextMenu && (
         <div className="canvas-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
           <button onClick={addContextNote} type="button">
