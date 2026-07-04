@@ -25,12 +25,14 @@ Open `http://localhost:5173`.
 
 ## Z.AI Configuration
 
-The server calls Z.AI through its OpenAI-compatible chat completions endpoint.
+The server calls Z.AI through its Anthropic-compatible Messages endpoint. `ZAI_BASE_URL`
+defaults to `https://api.z.ai/api/anthropic`; the server appends `/v1/messages`
+unless the configured URL already includes `/v1` or `/v1/messages`.
 
 ```bash
 ZAI_API_KEY=your-zai-api-key
 ZAI_MODEL=glm-5.2
-ZAI_BASE_URL=https://api.z.ai/api/paas/v4
+ZAI_BASE_URL=https://api.z.ai/api/anthropic
 ```
 
 ## Build
@@ -44,5 +46,5 @@ NODE_ENV=production node dist-server/index.js
 
 - Prompt pack: `ai_engineering_interviewer_prompts/`
 - AI Engineering Field Guide: `https://github.com/alexeygrigorev/ai-engineering-field-guide`
-- Z.AI OpenAI-compatible API docs: `https://docs.z.ai/guides/develop/openai/python`
+- Z.AI Anthropic-compatible endpoint setup: `https://docs.z.ai/scenario-example/develop-tools/claude`
 - AI Shipping Labs/DataOps process reference: `https://github.com/DataTalksClub/dataops/blob/main/_docs/PROCESS.md`
