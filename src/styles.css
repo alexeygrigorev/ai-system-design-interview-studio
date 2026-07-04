@@ -388,10 +388,9 @@ button:disabled {
 }
 
 .component-toolbar {
-  border-left: 1px solid #e3e7ef;
   display: flex;
   gap: 7px;
-  padding-left: 10px;
+  padding-left: 4px;
 }
 
 .component-chip {
@@ -454,17 +453,45 @@ button:disabled {
 
 .canvas-zoom-controls {
   align-items: center;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid #dce2ec;
-  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(216, 222, 232, 0.72);
+  border-radius: 6px;
   bottom: 14px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
   display: flex;
-  gap: 5px;
-  padding: 5px;
+  gap: 3px;
+  padding: 3px;
   position: absolute;
   right: 14px;
   z-index: 15;
+}
+
+.canvas-zoom-controls .icon-button {
+  background: transparent;
+  border-color: transparent;
+  color: #667085;
+  height: 28px;
+  width: 28px;
+}
+
+.canvas-zoom-controls .icon-button:hover {
+  background: rgba(241, 244, 250, 0.82);
+  color: #374151;
+}
+
+.canvas-zoom-controls .zoom-button {
+  background: transparent;
+  border-color: transparent;
+  color: #667085;
+  font-size: 11px;
+  height: 28px;
+  min-width: 42px;
+  padding: 0 6px;
+}
+
+.canvas-zoom-controls .zoom-button:hover {
+  background: rgba(241, 244, 250, 0.82);
+  color: #374151;
 }
 
 .icon-button.danger {
