@@ -1,4 +1,4 @@
-import { Bot, Download, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
+import { Bot, Download, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -33,6 +33,17 @@ const hiddenTechnicalRequirementPhrases = [
   "monitoring",
   "retrieval recall",
   "unanswerable"
+];
+
+const interviewHints = [
+  "Users and roles",
+  "Success criteria",
+  "Data sources",
+  "Scale and usage",
+  "Latency expectations",
+  "Safety and privacy",
+  "Access control",
+  "System requirements"
 ];
 
 function candidateVisibleRequirements(constraints: string[]) {
@@ -134,6 +145,7 @@ function App() {
   const [activePersona, setActivePersona] = useState<Persona>(persistedState.activePersona ?? "neutral");
   const [activeTopic, setActiveTopic] = useState(persistedState.activeTopic ?? interviewProblems[0].title);
   const [remainingSeconds, setRemainingSeconds] = useState(persistedState.remainingSeconds ?? duration * 60);
+  const [cornerPanel, setCornerPanel] = useState<"hints" | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
@@ -256,6 +268,7 @@ function App() {
     setError("");
     setMessages([{ role: "assistant", content: openingPlaceholder(resolvedTopic) }]);
     setShapes([]);
+    setCornerPanel(null);
     setRemainingSeconds(duration * 60);
     setScreen("interview");
 
@@ -314,6 +327,7 @@ function App() {
     setAnswer("");
     setError("");
     setShapes([]);
+    setCornerPanel(null);
     setActiveConstraints([]);
     setActiveBrief(undefined);
     setTopic("__random__");
@@ -328,6 +342,7 @@ function App() {
     setAnswer("");
     setError("");
     setShapes([]);
+    setCornerPanel(null);
     setRemainingSeconds(duration * 60);
     setScreen("interview");
   }
@@ -475,6 +490,23 @@ function App() {
             </>
           )}
         />
+        <div className="canvas-corner-tools">
+          {cornerPanel === "hints" && (
+            <div className="corner-popover" role="dialog" aria-label="Interview hints">
+              <ul>
+                {interviewHints.map((hint) => <li key={hint}>{hint}</li>)}
+              </ul>
+            </div>
+          )}
+          <button
+            className={cornerPanel === "hints" ? "corner-tool active" : "corner-tool"}
+            onClick={() => setCornerPanel((current) => (current === "hints" ? null : "hints"))}
+            type="button"
+          >
+            <Lightbulb size={15} />
+            Hints
+          </button>
+        </div>
       </section>
 
       <aside className="interview-panel">

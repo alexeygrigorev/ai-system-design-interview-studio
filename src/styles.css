@@ -186,6 +186,61 @@ button:disabled {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.canvas-corner-tools {
+  align-items: flex-start;
+  bottom: 14px;
+  display: grid;
+  gap: 8px;
+  left: 14px;
+  position: absolute;
+  z-index: 15;
+}
+
+.corner-tool {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #dce2ec;
+  border-radius: 6px;
+  color: #4b5563;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  min-height: 32px;
+  padding: 7px 9px;
+  width: fit-content;
+}
+
+.corner-tool:hover,
+.corner-tool.active {
+  background: #ffffff;
+  border-color: #b9c4d6;
+  color: #263245;
+}
+
+.corner-popover {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  color: #344154;
+  font-size: 13px;
+  line-height: 1.35;
+  max-width: 260px;
+  padding: 10px 12px;
+}
+
+.corner-popover ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.corner-popover li + li {
+  margin-top: 4px;
 }
 
 .interview-panel {
