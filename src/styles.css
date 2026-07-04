@@ -337,18 +337,18 @@ button:disabled {
 }
 
 .label-editor {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.9);
   border: 0;
-  border-radius: 0;
+  border-radius: 4px;
   box-shadow: none;
   color: #1f2937;
   font-size: 16px;
   font-weight: 500;
-  padding: 5px 8px;
+  line-height: 1.15;
+  padding: 1px 6px 2px;
   position: fixed;
   text-align: center;
   transform: translate(-50%, -50%);
-  width: min(150px, calc(100vw - 32px));
   z-index: 12;
 }
 

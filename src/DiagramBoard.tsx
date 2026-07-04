@@ -108,6 +108,53 @@ function displayLabel(label: string) {
   return label.length > 24 ? `${label.slice(0, 21)}...` : label;
 }
 
+function labelBounds(shape: DiagramShape, shapes: DiagramShape[]) {
+  if (!shape.label) return null;
+  const position = labelPosition(shape, shapes);
+  const textWidth = Math.max(36, displayLabel(shape.label).length * shapeLabelSize * 0.58);
+  const height = shapeLabelSize + 10;
+
+  if (shape.type === "note") {
+    return {
+      x: position.x - 6,
+      y: position.y - shapeLabelSize - 4,
+      width: textWidth + 12,
+      height
+    };
+  }
+
+  if (shape.type === "arrow") {
+    return {
+      x: position.x - textWidth / 2 - 8,
+      y: position.y - height / 2,
+      width: textWidth + 16,
+      height
+    };
+  }
+
+  return {
+    x: position.x - textWidth / 2 - 8,
+    y: position.y - shapeLabelSize - 4,
+    width: textWidth + 16,
+    height
+  };
+}
+
+function labelContains(shape: DiagramShape, shapes: DiagramShape[], point: Point) {
+  const bounds = labelBounds(shape, shapes);
+  if (!bounds) return false;
+  return point.x >= bounds.x
+    && point.x <= bounds.x + bounds.width
+    && point.y >= bounds.y
+    && point.y <= bounds.y + bounds.height;
+}
+
+function findLabelAt(shapes: DiagramShape[], point: Point) {
+  return [...shapes]
+    .reverse()
+    .find((shape) => labelContains(shape, shapes, point));
+}
+
 function defaultSize(kind: PrimitiveKind) {
   if (kind === "user") return { width: 124, height: 90, type: "ellipse" as const };
   if (kind === "human-review") return { width: 150, height: 90, type: "ellipse" as const };
@@ -218,7 +265,7 @@ function labelPosition(shape: DiagramShape, shapes: DiagramShape[]): Point {
     const endpoints = connectorEndpoints(shape, shapes);
     return {
       x: (endpoints.start.x + endpoints.end.x) / 2,
-      y: (endpoints.start.y + endpoints.end.y) / 2
+      y: (endpoints.start.y + endpoints.end.y) / 2 + 4
     };
   }
 
@@ -255,6 +302,12 @@ function labelPosition(shape: DiagramShape, shapes: DiagramShape[]): Point {
   }
 
   return { x: label.x, y: label.y + 6 };
+}
+
+function editorAnchorPosition(shape: DiagramShape, shapes: DiagramShape[]): Point {
+  const position = labelPosition(shape, shapes);
+  if (shape.type === "arrow") return position;
+  return { x: position.x, y: position.y - shapeLabelSize * 0.35 };
 }
 
 function findConnectorAt(shapes: DiagramShape[], point: Point) {
@@ -453,7 +506,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
   function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
     const point = toCanvasPoint(event);
-    const hit = findShapeAt(shapes, point);
+    const hit = findShapeAt(shapes, point) ?? findLabelAt(shapes, point);
     const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
 
     if (tool === "component") {
@@ -469,9 +522,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       return;
     }
 
+    const draggableHit = hit && hit.type !== "arrow";
     setSelectedId(hit?.id ?? connectorHit?.id ?? null);
-    setDragStart(hit ? point : null);
-    if (hit) {
+    setDragStart(draggableHit ? point : null);
+    if (draggableHit) {
       dragSnapshotRef.current = shapes;
       didDragRef.current = false;
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -633,7 +687,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   function onContextMenu(event: React.MouseEvent<SVGSVGElement>) {
     event.preventDefault();
     const point = toCanvasPoint(event);
-    const hit = findShapeAt(shapes, point);
+    const hit = findShapeAt(shapes, point) ?? findLabelAt(shapes, point);
     const connectorHit = hit ? undefined : findConnectorAt(shapes, point);
     if (!hit) {
       setSelectedId(connectorHit?.id ?? null);
@@ -752,8 +806,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     };
   }, []);
 
-  const editorPosition = editingShape ? toViewportPoint(labelPosition(editingShape, shapes)) : null;
+  const editorPosition = editingShape ? toViewportPoint(editorAnchorPosition(editingShape, shapes)) : null;
   const editorFontSize = editingShape ? toViewportFontSize() : shapeLabelSize;
+  const editorWidth = Math.min(280, Math.max(44, editingLabel.length * editorFontSize * 0.62 + 18));
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
   return (
@@ -839,6 +894,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         )}
         {shapes.map((shape) => {
           const selected = shape.id === selectedId;
+          const showLabel = shape.id !== editingId;
           const label = centerOf(shape);
           const strokeWidth = selected ? "3" : "2";
           if (shape.type === "rect") {
@@ -862,7 +918,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   />
                   <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
                   <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth={strokeWidth} />
-                  {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -885,7 +941,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                     strokeWidth={strokeWidth}
                   />
                   <ellipse cx={leftCx} cy={cy} rx={endWidth / 2} ry={tubeHeight / 2} fill="#eef4ff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  {shape.label && <text x={label.x} y={shape.y + shape.height - 5} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 5} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -922,7 +978,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                       <path d={`M ${visualX + visualWidth - 15} ${topY - 14} L ${visualX + visualWidth - 8} ${topY - 12} L ${visualX + visualWidth - 12} ${topY - 2}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
                     </>
                   )}
-                  {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -934,7 +990,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   <rect x={shape.x + 14} y={shape.y + 12} width="64" height="24" rx="4" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
                   <text x={shape.x + 46} y={shape.y + 29} textAnchor="middle" fill="#1d4ed8" fontSize="10" fontWeight="600">MODEL</text>
                   <path d={`M ${shape.x + shape.width - 48} ${shape.y + 20} h 24 m -12 -12 v 24`} stroke={componentColor} strokeLinecap="round" strokeWidth="2" />
-                  {shape.label && <text x={label.x} y={label.y + 11} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={label.y + 11} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -946,7 +1002,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   <rect x={shape.x + 16} y={shape.y + 17} width="36" height="30" rx="4" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
                   <line x1={shape.x + 62} y1={shape.y + 25} x2={shape.x + shape.width - 22} y2={shape.y + 25} stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
                   <line x1={shape.x + 62} y1={shape.y + 41} x2={shape.x + shape.width - 54} y2={shape.y + 41} stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
-                  {shape.label && <text x={label.x} y={shape.y + shape.height - 14} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 14} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -958,7 +1014,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   <rect x={shape.x + 18} y={shape.y + 12} width="38" height="28" rx="5" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
                   <path d={`M ${shape.x + 66} ${shape.y + 16} H ${shape.x + 84} M ${shape.x + 66} ${shape.y + 26} H ${shape.x + 92} M ${shape.x + 66} ${shape.y + 36} H ${shape.x + 80}`} stroke={componentColor} strokeLinecap="round" strokeWidth="2" />
                   <path d={`M ${shape.x + 30} ${shape.y + 22} L ${shape.x + 25} ${shape.y + 26} L ${shape.x + 30} ${shape.y + 30} M ${shape.x + 44} ${shape.y + 22} L ${shape.x + 49} ${shape.y + 26} L ${shape.x + 44} ${shape.y + 30}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-                  {shape.label && <text x={label.x} y={shape.y + shape.height - 9} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 9} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -966,7 +1022,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             return (
               <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                 <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                {shape.label && <text x={label.x} y={label.y + 6} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                {showLabel && shape.label && <text x={label.x} y={label.y + 6} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
               </g>
             );
           }
@@ -977,7 +1033,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                   <circle cx={label.x} cy={shape.y + 24} r="12" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
                   <path d={`M ${label.x - 24} ${shape.y + 59} C ${label.x - 16} ${shape.y + 42}, ${label.x + 16} ${shape.y + 42}, ${label.x + 24} ${shape.y + 59}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
-                  {shape.label && <text x={label.x} y={shape.y + shape.height - 8} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 8} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -991,7 +1047,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                     <path d={`M ${shape.x + shape.width - 47} ${shape.y + 32} L ${shape.x + shape.width - 38} ${shape.y + 41} L ${shape.x + shape.width - 22} ${shape.y + 23}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
                   </>
                 )}
-                {shape.label && <text x={label.x} y={shape.y + shape.height - 15} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 15} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
               </g>
             );
           }
@@ -1000,8 +1056,8 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
               <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                 <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#fff7d6" stroke={noteColor} strokeWidth={strokeWidth} />
                 <text x={shape.x + 14} y={shape.y + 30} fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}>
-                  {shape.label && <title>{shape.label}</title>}
-                  {shape.label ? displayLabel(shape.label) : ""}
+                  {showLabel && shape.label && <title>{shape.label}</title>}
+                  {showLabel && shape.label ? displayLabel(shape.label) : ""}
                 </text>
               </g>
             );
@@ -1023,7 +1079,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
                 <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth="2" markerEnd={`url(#${markerId})`} />
-                {shape.label && (
+                {showLabel && shape.label && (
                   <text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle" dominantBaseline="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight} paintOrder="stroke" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="7">
                     <title>{shape.label}</title>
                     {labelText}
@@ -1090,7 +1146,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             if (event.key === "Enter") commitEditing();
             if (event.key === "Escape") cancelEditing();
           }}
-          style={{ fontSize: editorFontSize, left: editorPosition.x, top: editorPosition.y }}
+          style={{ fontSize: editorFontSize, left: editorPosition.x, top: editorPosition.y, width: editorWidth }}
           aria-label="Edit component title"
         />
       )}
