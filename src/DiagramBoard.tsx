@@ -682,6 +682,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
             <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#d7dde7" strokeWidth="1" />
           </pattern>
+          <marker id="connector-preview-arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M 0 0 L 8 3 L 0 6 z" fill={handleColor} />
+          </marker>
         </defs>
         <rect width={canvasViewBox.width} height={canvasViewBox.height} fill="url(#grid)" />
         {connectorDrag && (
@@ -691,8 +694,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             x2={connectorDrag.current.x}
             y2={connectorDrag.current.y}
             stroke={handleColor}
-            strokeDasharray="10 8"
-            strokeWidth="5"
+            strokeLinecap="round"
+            strokeWidth="4"
+            markerEnd="url(#connector-preview-arrowhead)"
           />
         )}
         {reattachDrag && (
@@ -702,8 +706,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             x2={reattachDrag.endpoint === "source" ? reattachDrag.fixed.x : reattachDrag.current.x}
             y2={reattachDrag.endpoint === "source" ? reattachDrag.fixed.y : reattachDrag.current.y}
             stroke={handleColor}
-            strokeDasharray="10 8"
-            strokeWidth="5"
+            strokeLinecap="round"
+            strokeWidth="4"
+            markerEnd="url(#connector-preview-arrowhead)"
           />
         )}
         {shapes.map((shape) => {
