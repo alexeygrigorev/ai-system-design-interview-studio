@@ -644,12 +644,13 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                   <path
-                    d={`M ${visualX} ${topY} L ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 1 ${visualX + visualWidth} ${bottomY} L ${visualX + visualWidth} ${topY} Z`}
+                    d={`M ${visualX} ${topY} L ${visualX} ${bottomY} M ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY}`}
                     fill="#ffffff"
                     stroke={componentColor}
                     strokeWidth={strokeWidth}
                   />
                   <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
                   {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
@@ -690,12 +691,13 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                   <path
-                    d={`M ${visualX} ${topY} L ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 1 ${visualX + visualWidth} ${bottomY} L ${visualX + visualWidth} ${topY} Z`}
+                    d={`M ${visualX} ${topY} L ${visualX} ${bottomY} M ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY}`}
                     fill="#ffffff"
                     stroke={componentColor}
                     strokeWidth={strokeWidth}
                   />
                   <ellipse cx={label.x} cy={topY} rx={ellipseRx} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${visualX} ${bottomY} A ${ellipseRx} ${ellipseRy} 0 0 0 ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
                   {shape.indexKind === "text" ? (
                     <>
                       <circle cx={visualX + visualWidth - 7} cy={topY - 12} r="7" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
