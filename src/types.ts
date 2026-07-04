@@ -47,4 +47,6 @@ export interface DiagramShape {
   points?: Point[];
   sourceId?: string;
   targetId?: string;
+  sourceHandleId?: string;
+  targetHandleId?: string;
 }

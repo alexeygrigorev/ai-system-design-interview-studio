@@ -24,10 +24,11 @@ interface DiagramBoardProps {
   sessionControls?: ReactNode;
 }
 
+type ConnectionHandle = { id: string; x: number; y: number };
+
 const componentColor = "#2563eb";
 const noteColor = "#d97706";
 const connectorColor = componentColor;
-const selectedConnectorColor = "#1f2937";
 const handleColor = "#0f766e";
 const shapeLabelSize = 14;
 const shapeLabelWeight = 500;
@@ -160,14 +161,52 @@ function visualShapeBounds(shape: DiagramShape) {
   return bounds;
 }
 
+function connectionHandles(shape: DiagramShape): ConnectionHandle[] {
+  const bounds = visualShapeBounds(shape);
+  return [
+    { id: "top", x: bounds.x + bounds.width / 2, y: bounds.y },
+    { id: "right", x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
+    { id: "bottom", x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
+    { id: "left", x: bounds.x, y: bounds.y + bounds.height / 2 }
+  ];
+}
+
+function nearestConnectionHandle(shape: DiagramShape, point: Point) {
+  return connectionHandles(shape).reduce((nearest, handle) => (
+    Math.hypot(point.x - handle.x, point.y - handle.y) < Math.hypot(point.x - nearest.x, point.y - nearest.y)
+      ? handle
+      : nearest
+  ));
+}
+
+function connectionHandleById(shape: DiagramShape, handleId: string | undefined) {
+  return connectionHandles(shape).find((handle) => handle.id === handleId);
+}
+
+function inferConnectionHandles(source: DiagramShape, target: DiagramShape) {
+  const sourceHandles = connectionHandles(source);
+  const targetHandles = connectionHandles(target);
+  let best = { source: sourceHandles[0], target: targetHandles[0], distance: Number.POSITIVE_INFINITY };
+
+  for (const sourceHandle of sourceHandles) {
+    for (const targetHandle of targetHandles) {
+      const distance = Math.hypot(sourceHandle.x - targetHandle.x, sourceHandle.y - targetHandle.y);
+      if (distance < best.distance) best = { source: sourceHandle, target: targetHandle, distance };
+    }
+  }
+
+  return best;
+}
+
 function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
   const source = shapes.find((candidate) => candidate.id === shape.sourceId);
   const target = shapes.find((candidate) => candidate.id === shape.targetId);
 
   if (source && target) {
-    const start = centerOf(source);
-    const end = centerOf(target);
-    return { start, end };
+    const inferred = inferConnectionHandles(source, target);
+    const sourceHandle = connectionHandleById(source, shape.sourceHandleId) ?? inferred.source;
+    const targetHandle = connectionHandleById(target, shape.targetHandleId) ?? inferred.target;
+    return { start: sourceHandle, end: targetHandle };
   }
 
   return {
@@ -186,22 +225,12 @@ function findConnectorAt(shapes: DiagramShape[], point: Point) {
     });
 }
 
-function connectionHandles(shape: DiagramShape) {
-  const bounds = visualShapeBounds(shape);
-  return [
-    { id: "top", x: bounds.x + bounds.width / 2, y: bounds.y },
-    { id: "right", x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
-    { id: "bottom", x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
-    { id: "left", x: bounds.x, y: bounds.y + bounds.height / 2 }
-  ];
-}
-
 export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoardProps) {
   const [tool, setTool] = useState<Tool>("select");
   const [componentKind, setComponentKind] = useState<PrimitiveKind>("service");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
-  const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; start: Point; current: Point } | null>(null);
+  const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; sourceHandleId: string; start: Point; current: Point } | null>(null);
   const [reattachDrag, setReattachDrag] = useState<{ arrowId: string; endpoint: "source" | "target"; fixed: Point; current: Point } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
   const [indexChooser, setIndexChooser] = useState<{ x: number; y: number; shapeId: string } | null>(null);
@@ -306,22 +335,24 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setTool("select");
   }
 
-  function addConnector(sourceId: string, target: DiagramShape) {
+  function addConnector(sourceId: string, sourceHandleId: string, target: DiagramShape, targetPoint: Point) {
     if (sourceId === target.id) return;
     const source = shapes.find((shape) => shape.id === sourceId);
     if (!source) return;
-    const start = centerOf(source);
-    const end = centerOf(target);
+    const sourceHandle = connectionHandleById(source, sourceHandleId) ?? nearestConnectionHandle(source, centerOf(target));
+    const targetHandle = nearestConnectionHandle(target, targetPoint);
     const next: DiagramShape = {
       id: crypto.randomUUID(),
       type: "arrow",
-      x: start.x,
-      y: start.y,
-      width: end.x - start.x,
-      height: end.y - start.y,
+      x: sourceHandle.x,
+      y: sourceHandle.y,
+      width: targetHandle.x - sourceHandle.x,
+      height: targetHandle.y - sourceHandle.y,
       color: connectorColor,
       sourceId: source.id,
-      targetId: target.id
+      targetId: target.id,
+      sourceHandleId: sourceHandle.id,
+      targetHandleId: targetHandle.id
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(source.id);
@@ -411,9 +442,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           if (shape.id !== reattachDrag.arrowId || shape.type !== "arrow") return shape;
           if (reattachDrag.endpoint === "source" && target.id === shape.targetId) return shape;
           if (reattachDrag.endpoint === "target" && target.id === shape.sourceId) return shape;
+          const targetHandle = nearestConnectionHandle(target, point);
           const nextShape = reattachDrag.endpoint === "source"
-            ? { ...shape, sourceId: target.id }
-            : { ...shape, targetId: target.id };
+            ? { ...shape, sourceId: target.id, sourceHandleId: targetHandle.id }
+            : { ...shape, targetId: target.id, targetHandleId: targetHandle.id };
           const endpoints = connectorEndpoints(nextShape, currentShapes);
           return {
             ...nextShape,
@@ -430,7 +462,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     if (connectorDrag) {
       const point = toCanvasPoint(event);
       const target = findShapeAt(shapes, point);
-      if (target) addConnector(connectorDrag.sourceId, target);
+      if (target) addConnector(connectorDrag.sourceId, connectorDrag.sourceHandleId, target, point);
       setConnectorDrag(null);
       return;
     }
@@ -530,10 +562,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setIndexChooser(null);
   }
 
-  function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: Point) {
+  function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: ConnectionHandle) {
     event.stopPropagation();
     setSelectedId(sourceId);
-    setConnectorDrag({ sourceId, start, current: start });
+    setConnectorDrag({ sourceId, sourceHandleId: start.id, start, current: start });
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -889,11 +921,11 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
               <g key={shape.id}>
                 <defs>
                   <marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-                    <path d="M 0 0 L 8 3 L 0 6 z" fill={selected ? selectedConnectorColor : connectorColor} />
+                    <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
                   </marker>
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
-                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={selected ? selectedConnectorColor : connectorColor} strokeWidth={selected ? "4" : "2"} markerEnd={`url(#${markerId})`} />
+                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth="2" markerEnd={`url(#${markerId})`} />
               </g>
             );
           }
@@ -920,40 +952,20 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 className="connection-handle"
                 cx={endpoints.start.x}
                 cy={endpoints.start.y}
-                r="9"
-                fill="#ffffff"
-                stroke={selectedConnectorColor}
-                strokeWidth="2.5"
-                onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
-              />
-              <circle
-                className="connection-handle"
-                cx={endpoints.start.x}
-                cy={endpoints.start.y}
-                r="3"
-                fill={selectedConnectorColor}
+                r="8"
+                fill={handleColor}
                 stroke="#ffffff"
-                strokeWidth="1"
+                strokeWidth="3"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "source")}
               />
               <circle
                 className="connection-handle"
                 cx={endpoints.end.x}
                 cy={endpoints.end.y}
-                r="9"
-                fill="#ffffff"
-                stroke={selectedConnectorColor}
-                strokeWidth="2.5"
-                onPointerDown={(event) => startReattachDrag(event, selectedShape, "target")}
-              />
-              <circle
-                className="connection-handle"
-                cx={endpoints.end.x}
-                cy={endpoints.end.y}
-                r="3"
-                fill={selectedConnectorColor}
+                r="8"
+                fill={handleColor}
                 stroke="#ffffff"
-                strokeWidth="1"
+                strokeWidth="3"
                 onPointerDown={(event) => startReattachDrag(event, selectedShape, "target")}
               />
             </>
