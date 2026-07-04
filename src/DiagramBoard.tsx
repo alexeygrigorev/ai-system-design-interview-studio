@@ -30,7 +30,7 @@ const componentColor = "#2563eb";
 const noteColor = "#d97706";
 const connectorColor = componentColor;
 const handleColor = "#0f766e";
-const shapeLabelSize = 14;
+const shapeLabelSize = 16;
 const shapeLabelWeight = 500;
 
 const componentKinds: Array<{ kind: PrimitiveKind; label: string; icon: typeof Server }> = [
@@ -932,7 +932,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
                 <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth="2" markerEnd={`url(#${markerId})`} />
                 {shape.label && (
-                  <text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle" dominantBaseline="middle" fill="#1f2937" fontSize="14" fontWeight="550" paintOrder="stroke" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="7">
+                  <text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle" dominantBaseline="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight} paintOrder="stroke" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="7">
                     <title>{shape.label}</title>
                     {labelText}
                   </text>
