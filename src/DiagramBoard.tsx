@@ -92,7 +92,7 @@ function displayLabel(label: string) {
 function defaultSize(kind: PrimitiveKind) {
   if (kind === "user") return { width: 124, height: 90, type: "ellipse" as const };
   if (kind === "human-review") return { width: 150, height: 90, type: "ellipse" as const };
-  if (kind === "datastore" || kind === "vector-index") return { width: 88, height: 96, type: "rect" as const };
+  if (kind === "datastore" || kind === "vector-index") return { width: 88, height: 220, type: "rect" as const };
   if (kind === "queue") return { width: 184, height: 64, type: "rect" as const };
   if (kind === "model") return { width: 176, height: 68, type: "rect" as const };
   return { width: 176, height: 64, type: "rect" as const };
@@ -586,9 +586,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             const labelText = shape.label ? displayLabel(shape.label) : "";
             if (shape.primitive === "datastore") {
               const visualWidth = 56;
-              const visualHeight = 64;
+              const visualHeight = 192;
               const visualX = label.x - visualWidth / 2;
-              const visualY = label.y - 38;
+              const visualY = label.y - 102;
               const topY = visualY + 12;
               const bottomY = visualY + visualHeight - 12;
               const ellipseRy = 10;
@@ -633,9 +633,9 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
 
             if (shape.primitive === "vector-index") {
               const visualWidth = 56;
-              const visualHeight = 64;
+              const visualHeight = 192;
               const visualX = label.x - visualWidth / 2;
-              const visualY = label.y - 38;
+              const visualY = label.y - 102;
               const topY = visualY + 12;
               const bottomY = visualY + visualHeight - 12;
               const ellipseRy = 10;
