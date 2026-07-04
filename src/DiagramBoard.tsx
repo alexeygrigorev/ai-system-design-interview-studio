@@ -207,6 +207,52 @@ function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
   };
 }
 
+function labelPosition(shape: DiagramShape, shapes: DiagramShape[]): Point {
+  const label = centerOf(shape);
+
+  if (shape.type === "arrow") {
+    const endpoints = connectorEndpoints(shape, shapes);
+    return {
+      x: (endpoints.start.x + endpoints.end.x) / 2,
+      y: (endpoints.start.y + endpoints.end.y) / 2
+    };
+  }
+
+  if (shape.primitive === "datastore" || shape.primitive === "vector-index") {
+    return { x: label.x, y: label.y - 56.5 + 101 + 18 };
+  }
+
+  if (shape.primitive === "queue") {
+    return { x: label.x, y: shape.y + shape.height - 5 };
+  }
+
+  if (shape.primitive === "model") {
+    return { x: label.x, y: label.y + 11 };
+  }
+
+  if (shape.primitive === "service") {
+    return { x: label.x, y: shape.y + shape.height - 14 };
+  }
+
+  if (shape.primitive === "tool") {
+    return { x: label.x, y: shape.y + shape.height - 9 };
+  }
+
+  if (shape.primitive === "user") {
+    return { x: label.x, y: shape.y + shape.height - 8 };
+  }
+
+  if (shape.type === "ellipse") {
+    return { x: label.x, y: shape.y + shape.height - 15 };
+  }
+
+  if (shape.type === "note") {
+    return { x: shape.x + 14, y: shape.y + 30 };
+  }
+
+  return { x: label.x, y: label.y + 6 };
+}
+
 function findConnectorAt(shapes: DiagramShape[], point: Point) {
   return [...shapes]
     .reverse()
@@ -659,17 +705,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     };
   }, []);
 
-  const editorPosition = editingShape
-    ? toViewportPoint(editingShape.type === "arrow"
-      ? (() => {
-        const endpoints = connectorEndpoints(editingShape, shapes);
-        return {
-          x: (endpoints.start.x + endpoints.end.x) / 2,
-          y: (endpoints.start.y + endpoints.end.y) / 2
-        };
-      })()
-      : centerOf(editingShape))
-    : null;
+  const editorPosition = editingShape ? toViewportPoint(labelPosition(editingShape, shapes)) : null;
   const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
   return (
@@ -986,7 +1022,11 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       {editingShape && editorPosition && (
         <input
           ref={editorRef}
-          className={editingShape.type === "arrow" ? "label-editor connector-label-editor" : "label-editor"}
+          className={[
+            "label-editor",
+            editingShape.type === "arrow" ? "connector-label-editor" : "",
+            editingShape.type === "note" ? "note-label-editor" : ""
+          ].filter(Boolean).join(" ")}
           value={editingLabel}
           onChange={(event) => setEditingLabel(event.target.value)}
           onBlur={commitEditing}

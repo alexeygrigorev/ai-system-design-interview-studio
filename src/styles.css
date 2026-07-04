@@ -332,6 +332,11 @@ button:disabled {
   box-shadow: 0 6px 18px rgba(31, 41, 55, 0.12);
 }
 
+.note-label-editor {
+  text-align: left;
+  transform: translateY(-50%);
+}
+
 .panel-heading {
   justify-content: space-between;
   gap: 12px;
