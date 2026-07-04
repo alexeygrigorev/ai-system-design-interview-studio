@@ -328,6 +328,10 @@ button:disabled {
   cursor: grab;
 }
 
+.drawing-surface.panning {
+  cursor: grabbing;
+}
+
 .connection-handle {
   cursor: crosshair;
 }

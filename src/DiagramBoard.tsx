@@ -272,6 +272,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [componentKind, setComponentKind] = useState<PrimitiveKind>("service");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
+  const [panStart, setPanStart] = useState<{ clientX: number; clientY: number; origin: Point } | null>(null);
   const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; sourceHandleId: string; start: Point; current: Point } | null>(null);
   const [reattachDrag, setReattachDrag] = useState<{ arrowId: string; endpoint: "source" | "target"; fixed: Point; current: Point } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
@@ -280,6 +281,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [editingLabel, setEditingLabel] = useState("");
   const [canvasViewBox, setCanvasViewBox] = useState({ width: 1200, height: 760 });
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
   const [redoStack, setRedoStack] = useState<DiagramShape[][]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -294,18 +296,22 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const activeKind = componentKinds.find((kind) => kind.kind === componentKind) ?? componentKinds[0];
 
   const canvasClass = useMemo(() => (
-    tool === "select" ? "drawing-surface selecting" : "drawing-surface"
-  ), [tool]);
+    [
+      "drawing-surface",
+      tool === "select" ? "selecting" : "",
+      panStart ? "panning" : ""
+    ].filter(Boolean).join(" ")
+  ), [panStart, tool]);
   const zoomedViewBox = useMemo(() => {
     const width = canvasViewBox.width / zoom;
     const height = canvasViewBox.height / zoom;
     return {
-      x: (canvasViewBox.width - width) / 2,
-      y: (canvasViewBox.height - height) / 2,
+      x: (canvasViewBox.width - width) / 2 + pan.x,
+      y: (canvasViewBox.height - height) / 2 + pan.y,
       width,
       height
     };
-  }, [canvasViewBox, zoom]);
+  }, [canvasViewBox, pan, zoom]);
 
   function toCanvasPoint(event: { clientX: number; clientY: number }) {
     const svg = svgRef.current;
@@ -469,10 +475,24 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       dragSnapshotRef.current = shapes;
       didDragRef.current = false;
       event.currentTarget.setPointerCapture(event.pointerId);
+    } else if (!connectorHit && tool === "select") {
+      setPanStart({ clientX: event.clientX, clientY: event.clientY, origin: pan });
+      didDragRef.current = false;
+      event.currentTarget.setPointerCapture(event.pointerId);
     }
   }
 
   function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (panStart) {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const dx = ((event.clientX - panStart.clientX) * zoomedViewBox.width) / rect.width;
+      const dy = ((event.clientY - panStart.clientY) * zoomedViewBox.height) / rect.height;
+      if (dx !== 0 || dy !== 0) didDragRef.current = true;
+      setPan({ x: panStart.origin.x - dx, y: panStart.origin.y - dy });
+      return;
+    }
     if (reattachDrag) {
       setReattachDrag({ ...reattachDrag, current: toCanvasPoint(event) });
       return;
@@ -529,6 +549,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     if (didDragRef.current && dragSnapshotRef.current) {
       rememberHistory(dragSnapshotRef.current);
     }
+    setPanStart(null);
     dragSnapshotRef.current = null;
     didDragRef.current = false;
     setDragStart(null);
@@ -537,6 +558,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   function selectTool(nextTool: Tool) {
     setTool(nextTool);
     setConnectorDrag(null);
+    setPanStart(null);
     setContextMenu(null);
   }
 
@@ -754,7 +776,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           <button className="icon-button" onClick={() => changeZoom(-0.1)} disabled={zoom <= minZoom} title="Zoom out" type="button">
             <Minus size={18} />
           </button>
-          <button className="zoom-button" onClick={() => setZoom(1)} title="Reset zoom" type="button">
+          <button className="zoom-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset zoom" type="button">
             {Math.round(zoom * 100)}%
           </button>
           <button className="icon-button" onClick={() => changeZoom(0.1)} disabled={zoom >= maxZoom} title="Zoom in" type="button">
