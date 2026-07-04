@@ -116,7 +116,6 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
   const dragSnapshotRef = useRef<DiagramShape[] | null>(null);
   const didDragRef = useRef(false);
 
-  const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
   const connectorSource = shapes.find((shape) => shape.id === connectorSourceId) ?? null;
   const activeKind = componentKinds.find((kind) => kind.kind === componentKind) ?? componentKinds[0];
   const ActiveKindIcon = activeKind.icon;
@@ -273,13 +272,6 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     setContextMenu(null);
   }
 
-  function updateSelectedLabel(label: string) {
-    if (!selectedId) return;
-    commitShapes((currentShapes) => currentShapes.map((shape) => (
-      shape.id === selectedId ? { ...shape, label } : shape
-    )));
-  }
-
   function deleteSelected() {
     if (!selectedId) return;
     commitShapes((currentShapes) => currentShapes.filter((shape) => (
@@ -401,22 +393,6 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
             {label}
           </button>
         ))}
-      </div>
-
-      <div className="selection-bar">
-        <label>
-          Selected label
-          <input
-            value={selectedShape?.label ?? ""}
-            onChange={(event) => updateSelectedLabel(event.target.value)}
-            placeholder={connectorSource ? `Connecting from ${connectorSource.label ?? "selected component"}` : "Select a component or note"}
-            disabled={!selectedShape || selectedShape.type === "arrow"}
-          />
-        </label>
-        <button className="secondary-button" onClick={deleteSelected} disabled={!selectedShape} type="button">
-          <Trash2 size={16} />
-          Delete
-        </button>
       </div>
 
       <svg
