@@ -324,7 +324,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       targetId: target.id
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
-    setSelectedId(next.id);
+    setSelectedId(source.id);
     setConnectorDrag(null);
     setTool("select");
   }
