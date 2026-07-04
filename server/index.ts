@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "vite";
+import { buildDiagramPromptContext } from "./diagramContext.js";
 import { buildSystemPrompt, type SessionConfig } from "./promptPack.js";
 import { callZai, type ChatMessage } from "./zaiClient.js";
 
@@ -73,7 +74,7 @@ app.post("/api/interview/turn", async (req, res) => {
     }
     const request = validateTurnRequest(req.body);
     const systemPrompt = await buildSystemPrompt(projectRoot, request.session);
-    const canvasSummary = JSON.stringify(request.canvasSummary ?? [], null, 2);
+    const diagramContext = buildDiagramPromptContext(request.canvasSummary);
     const instruction = request.messages.length === 0
       ? "Start the interview. Ask the opening system design question only."
       : "Continue the interview from the transcript. Ask the next best single follow-up question only.";
@@ -85,10 +86,13 @@ app.post("/api/interview/turn", async (req, res) => {
         role: "user",
         content: `${instruction}
 
-Current diagram artifacts:
-${canvasSummary}
+Current diagram text context:
+${diagramContext.textContext}
 
-Use diagram artifacts only as supporting evidence. Ask one concise question.`
+Raw canvas JSON (secondary evidence):
+${diagramContext.rawJson}
+
+Use the diagram text context as primary canvas evidence and the raw JSON only as secondary evidence. Ask one concise question.`
       }
     ];
 
@@ -107,7 +111,7 @@ app.post("/api/interview/assess", async (req, res) => {
     }
     const request = validateTurnRequest(req.body);
     const systemPrompt = await buildSystemPrompt(projectRoot, request.session);
-    const canvasSummary = JSON.stringify(request.canvasSummary ?? [], null, 2);
+    const diagramContext = buildDiagramPromptContext(request.canvasSummary);
 
     const messages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
@@ -116,8 +120,11 @@ app.post("/api/interview/assess", async (req, res) => {
         role: "user",
         content: `End the interview and provide final structured feedback in markdown.
 
-Canvas artifacts:
-${canvasSummary}
+Diagram text context:
+${diagramContext.textContext}
+
+Raw canvas JSON (secondary evidence):
+${diagramContext.rawJson}
 
 Use the configured rubric. Include:
 - Overall assessment.
@@ -130,7 +137,7 @@ Use the configured rubric. Include:
 - One concrete practice recommendation.
 - One concise example improved answer.
 
-Base feedback only on what the candidate said or drew. Do not invent details.`
+Base feedback only on what the candidate said or entered on the canvas. Do not invent details.`
       }
     ];
 

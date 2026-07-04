@@ -56,7 +56,8 @@ ${sessionPrompt}
 ${personaPrompt}
 
 Application instructions:
-- The candidate may use a diagram canvas. Treat canvas JSON as supporting evidence, not as a replacement for spoken reasoning.
+- The candidate may use a diagram canvas. Treat diagram text context as primary canvas evidence and raw canvas JSON as secondary evidence, not as a replacement for spoken reasoning.
+- Do not infer details that are not represented in the transcript, diagram text context, or raw canvas JSON.
 - Ask exactly one interviewer question per turn.
 - Keep interviewer turns concise.
 - For final assessment, base scores only on the transcript and canvas artifacts provided.`;
