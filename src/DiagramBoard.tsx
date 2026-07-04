@@ -495,6 +495,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           width: targetHandle.x - sourceHandle.x,
           height: targetHandle.y - sourceHandle.y,
           color: connectorColor,
+          connectorKind: "note-link",
           sourceId: source.id,
           targetId: next.id,
           sourceHandleId: sourceHandle.id,
@@ -1160,6 +1161,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           }
           if (shape.type === "arrow") {
             const markerId = `arrowhead-${shape.id}`;
+            const isNoteLink = shape.connectorKind === "note-link";
             const endpoints = connectorEndpoints(shape, shapes);
             const midpoint = {
               x: (endpoints.start.x + endpoints.end.x) / 2,
@@ -1174,7 +1176,18 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                   </marker>
                 </defs>
                 <line className="connector-hitline" x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke="transparent" strokeWidth="18" />
-                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth="2" markerEnd={`url(#${markerId})`} />
+                <line
+                  x1={endpoints.start.x}
+                  y1={endpoints.start.y}
+                  x2={endpoints.end.x}
+                  y2={endpoints.end.y}
+                  stroke={isNoteLink ? noteColor : connectorColor}
+                  strokeDasharray={isNoteLink ? "5 6" : undefined}
+                  strokeLinecap="round"
+                  strokeOpacity={isNoteLink ? "0.72" : undefined}
+                  strokeWidth={isNoteLink ? "1.6" : "2"}
+                  markerEnd={isNoteLink ? undefined : `url(#${markerId})`}
+                />
                 {showLabel && shape.label && (
                   <text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle" dominantBaseline="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight} paintOrder="stroke" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="7">
                     <title>{shape.label}</title>
