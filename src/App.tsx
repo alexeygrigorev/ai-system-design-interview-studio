@@ -1,4 +1,4 @@
-import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, Redo2, RotateCcw, Send, Trash2, Undo2, User } from "lucide-react";
+import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, Redo2, RotateCcw, Send, Trash2, Undo2, Upload, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -199,6 +199,16 @@ function downloadTextFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function isSessionSnapshot(value: unknown): value is {
+  answer?: unknown;
+  messages?: unknown;
+  remainingSeconds?: unknown;
+  session?: Partial<SessionConfig>;
+  shapes?: unknown;
+} {
+  return typeof value === "object" && value !== null && "session" in value;
+}
+
 function loadPersistedState(): Partial<PersistedState> {
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -235,6 +245,7 @@ function App() {
   const [checkedHints, setCheckedHints] = useState<string[]>([]);
   const sessionMenuRef = useRef<HTMLDetailsElement | null>(null);
   const customProblemRef = useRef<HTMLTextAreaElement | null>(null);
+  const loadSessionInputRef = useRef<HTMLInputElement | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
@@ -506,6 +517,45 @@ function App() {
     );
   }
 
+  async function loadSessionSnapshot(file: File) {
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      if (!isSessionSnapshot(parsed) || !parsed.session) {
+        throw new Error("This file is not a saved interview session.");
+      }
+      const loadedSession = parsed.session;
+      if (!loadedSession.brief || !loadedSession.topic || !loadedSession.persona || !loadedSession.level || !loadedSession.duration) {
+        throw new Error("The saved session is missing interview details.");
+      }
+      const loadedMessages = Array.isArray(parsed.messages) ? parsed.messages as ChatMessage[] : [];
+      const loadedShapes = Array.isArray(parsed.shapes) ? parsed.shapes as DiagramShape[] : [];
+      const loadedAnswer = typeof parsed.answer === "string" ? parsed.answer : "";
+      const loadedRemainingSeconds = typeof parsed.remainingSeconds === "number"
+        ? parsed.remainingSeconds
+        : loadedSession.duration * 60;
+
+      setLevel(loadedSession.level);
+      setDuration(loadedSession.duration);
+      setPersona(loadedSession.persona);
+      setTopic("__custom__");
+      setCustomTopic(loadedSession.topic);
+      setActivePersona(loadedSession.persona);
+      setActiveTopic(loadedSession.topic);
+      setActiveConstraints(loadedSession.constraints ?? []);
+      setActiveBrief(loadedSession.brief);
+      setMessages(loadedMessages);
+      setShapes(loadedShapes);
+      setAnswer(loadedAnswer);
+      setRemainingSeconds(loadedRemainingSeconds);
+      setCornerPanel(null);
+      setCheckedHints([]);
+      setError("");
+      setScreen("interview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load saved session.");
+    }
+  }
+
   if (screen === "setup") {
     return (
       <main className="setup-screen">
@@ -571,6 +621,21 @@ function App() {
           <button className="primary-button setup-start" onClick={startInterview} disabled={busy || !providerReady} type="button">
             {busy ? <Loader2 className="spin" size={17} /> : <Play size={17} />}
             Start interview
+          </button>
+          <input
+            ref={loadSessionInputRef}
+            accept="application/json,.json"
+            className="visually-hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void loadSessionSnapshot(file);
+              event.target.value = "";
+            }}
+            type="file"
+          />
+          <button className="secondary-button setup-load" onClick={() => loadSessionInputRef.current?.click()} type="button">
+            <Upload size={16} />
+            Load saved session
           </button>
         </section>
       </main>

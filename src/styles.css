@@ -104,6 +104,14 @@ button:disabled {
   opacity: 0.55;
 }
 
+.visually-hidden {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
 .setup-screen {
   align-items: center;
   background: #f7f8fb;
@@ -181,6 +189,22 @@ button:disabled {
 
 .setup-start {
   width: 100%;
+}
+
+.setup-load {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #667085;
+  font-size: 13px;
+  min-height: 34px;
+  padding: 7px 10px;
+  width: 100%;
+}
+
+.setup-load:hover {
+  background: #f8fafc;
+  border-color: #e0e6ef;
+  color: #374151;
 }
 
 .interview-shell {
