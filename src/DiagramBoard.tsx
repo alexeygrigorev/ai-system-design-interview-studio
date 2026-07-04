@@ -100,6 +100,10 @@ function isConnectableShape(shape: DiagramShape | null | undefined): shape is Di
   return Boolean(shape && shape.type !== "arrow" && shape.type !== "note");
 }
 
+function primitiveKindFromDragData(value: string) {
+  return componentKinds.find((component) => component.kind === value)?.kind;
+}
+
 function distanceToSegment(point: Point, start: Point, end: Point) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -365,6 +369,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [panStart, setPanStart] = useState<{ clientX: number; clientY: number; origin: Point } | null>(null);
   const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; sourceHandleId: string; start: Point; current: Point } | null>(null);
   const [reattachDrag, setReattachDrag] = useState<{ arrowId: string; endpoint: "source" | "target"; fixed: Point; current: Point } | null>(null);
+  const [draggingComponentKind, setDraggingComponentKind] = useState<PrimitiveKind | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
   const [indexChooser, setIndexChooser] = useState<{ x: number; y: number; shapeId: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -387,9 +392,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     [
       "drawing-surface",
       tool === "select" ? "selecting" : "",
-      panStart ? "panning" : ""
+      panStart ? "panning" : "",
+      draggingComponentKind ? "component-dropping" : ""
     ].filter(Boolean).join(" ")
-  ), [panStart, tool]);
+  ), [draggingComponentKind, panStart, tool]);
   const zoomedViewBox = useMemo(() => {
     const width = canvasViewBox.width / zoom;
     const height = canvasViewBox.height / zoom;
@@ -684,6 +690,32 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setContextMenu(null);
   }
 
+  function startComponentToolbarDrag(event: React.DragEvent<HTMLButtonElement>, kind: PrimitiveKind) {
+    setComponentKind(kind);
+    setDraggingComponentKind(kind);
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("application/x-aisd-component", kind);
+    event.dataTransfer.setData("text/plain", kind);
+  }
+
+  function finishComponentToolbarDrag() {
+    setDraggingComponentKind(null);
+  }
+
+  function onCanvasDragOver(event: React.DragEvent<SVGSVGElement>) {
+    if (!draggingComponentKind) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function onCanvasDrop(event: React.DragEvent<SVGSVGElement>) {
+    const droppedKind = primitiveKindFromDragData(event.dataTransfer.getData("application/x-aisd-component")) ?? draggingComponentKind;
+    if (!droppedKind) return;
+    event.preventDefault();
+    addComponent(toCanvasPoint(event), { x: event.clientX, y: event.clientY }, droppedKind);
+    setDraggingComponentKind(null);
+  }
+
   function changeZoom(delta: number) {
     setZoom((current) => Math.min(maxZoom, Math.max(minZoom, Math.round((current + delta) * 10) / 10)));
   }
@@ -930,7 +962,17 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         </div>
         <div className="component-toolbar" aria-label="Component types">
           {componentKinds.map(({ kind, label, icon: Icon }) => (
-            <button key={kind} className={tool === "component" && componentKind === kind ? "component-chip active" : "component-chip"} onClick={() => { setComponentKind(kind); selectTool("component"); }} title={label} type="button">
+            <button
+              key={kind}
+              aria-grabbed={draggingComponentKind === kind}
+              className={tool === "component" && componentKind === kind ? "component-chip active" : "component-chip"}
+              draggable
+              onClick={() => { setComponentKind(kind); selectTool("component"); }}
+              onDragEnd={finishComponentToolbarDrag}
+              onDragStart={(event) => startComponentToolbarDrag(event, kind)}
+              title={label}
+              type="button"
+            >
               <Icon size={15} />
             </button>
           ))}
@@ -968,6 +1010,8 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onDoubleClick={onCanvasDoubleClick}
+        onDragOver={onCanvasDragOver}
+        onDrop={onCanvasDrop}
         onContextMenu={onContextMenu}
         preserveAspectRatio="none"
       >

@@ -633,6 +633,10 @@ button:disabled {
   cursor: grabbing;
 }
 
+.drawing-surface.component-dropping {
+  cursor: copy;
+}
+
 .connection-handle {
   cursor: crosshair;
 }
