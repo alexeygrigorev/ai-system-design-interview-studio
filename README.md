@@ -7,7 +7,7 @@ The app uses the unpacked prompt pack in `ai_engineering_interviewer_prompts/` a
 ## Features
 
 - AI engineering interview setup by level, duration, persona, feedback mode, topic, and constraints
-- Drawing board with rectangles, ellipses, notes, arrows, lines, freehand strokes, colors, undo, clear, and JSON export
+- Focused system design canvas with components, notes, attached connectors, label editing, undo, clear, and JSON export
 - Transcript-based interviewer turns
 - End-of-session structured feedback against the AI engineering rubric
 - Server-side Z.AI integration, keeping API keys out of the browser

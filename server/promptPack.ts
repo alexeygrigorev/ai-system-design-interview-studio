@@ -3,7 +3,7 @@ import path from "node:path";
 
 export type CandidateLevel = "junior" | "mid-level" | "senior" | "staff";
 export type Persona = "supportive" | "neutral" | "adversarial";
-export type FeedbackMode = "end_only" | "midpoint_and_end" | "coaching_after_sections";
+export type FeedbackMode = "end_only";
 
 export interface SessionConfig {
   level: CandidateLevel;

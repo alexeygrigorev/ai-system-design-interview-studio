@@ -1,20 +1,17 @@
 import {
   ArrowRight,
   BrainCircuit,
-  Circle,
   Database,
   Download,
   GitBranch,
   HardDrive,
   ListOrdered,
   MousePointer2,
-  Pencil,
   Server,
-  Slash,
-  Square,
   StickyNote,
   Trash2,
-  Undo2
+  Undo2,
+  UserCheck
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
@@ -25,46 +22,19 @@ interface DiagramBoardProps {
   setShapes: Dispatch<SetStateAction<DiagramShape[]>>;
 }
 
-const palette = ["#2563eb", "#0891b2", "#16a34a", "#d97706", "#dc2626", "#4b5563"];
+const componentColor = "#2563eb";
+const noteColor = "#d97706";
+const connectorColor = "#4b5563";
 
-const tools: Array<{ id: Tool; label: string; icon: typeof Square }> = [
-  { id: "select", label: "Select", icon: MousePointer2 },
-  { id: "rect", label: "Rectangle", icon: Square },
-  { id: "ellipse", label: "Ellipse", icon: Circle },
-  { id: "note", label: "Note", icon: StickyNote },
-  { id: "arrow", label: "Arrow", icon: ArrowRight },
-  { id: "line", label: "Line", icon: Slash },
-  { id: "freehand", label: "Freehand", icon: Pencil }
+const componentKinds: Array<{ kind: PrimitiveKind; label: string; icon: typeof Server }> = [
+  { kind: "service", label: "Service", icon: Server },
+  { kind: "datastore", label: "Datastore", icon: Database },
+  { kind: "queue", label: "Queue", icon: ListOrdered },
+  { kind: "vector-index", label: "Vector index", icon: HardDrive },
+  { kind: "model", label: "Model", icon: BrainCircuit },
+  { kind: "tool", label: "Tool", icon: GitBranch },
+  { kind: "human-review", label: "Human review", icon: UserCheck }
 ];
-
-const primitiveButtons: Array<{ kind: PrimitiveKind; label: string; icon: typeof Server; color: string }> = [
-  { kind: "service", label: "Service", icon: Server, color: "#2563eb" },
-  { kind: "datastore", label: "Datastore", icon: Database, color: "#16a34a" },
-  { kind: "queue", label: "Queue", icon: ListOrdered, color: "#d97706" },
-  { kind: "vector-index", label: "Vector index", icon: HardDrive, color: "#0891b2" },
-  { kind: "model", label: "Model", icon: BrainCircuit, color: "#7c3aed" },
-  { kind: "tool", label: "Tool", icon: GitBranch, color: "#4b5563" },
-  { kind: "human-review", label: "Human review", icon: StickyNote, color: "#dc2626" }
-];
-
-function normalizeShape(shape: DiagramShape) {
-  if (shape.type === "freehand" || shape.type === "line" || shape.type === "arrow") return shape;
-  const x = shape.width < 0 ? shape.x + shape.width : shape.x;
-  const y = shape.height < 0 ? shape.y + shape.height : shape.y;
-  return {
-    ...shape,
-    x,
-    y,
-    width: Math.abs(shape.width),
-    height: Math.abs(shape.height)
-  };
-}
-
-function pointsToPath(points: Point[] = []) {
-  if (points.length === 0) return "";
-  const [first, ...rest] = points;
-  return `M ${first.x} ${first.y} ${rest.map((point) => `L ${point.x} ${point.y}`).join(" ")}`;
-}
 
 function downloadDiagram(shapes: DiagramShape[]) {
   const blob = new Blob([JSON.stringify(shapes, null, 2)], { type: "application/json" });
@@ -77,19 +47,7 @@ function downloadDiagram(shapes: DiagramShape[]) {
 }
 
 function shapeBounds(shape: DiagramShape) {
-  if (shape.type === "freehand") {
-    const points = shape.points ?? [];
-    const xs = [shape.x, ...points.map((point) => point.x)];
-    const ys = [shape.y, ...points.map((point) => point.y)];
-    return {
-      x: Math.min(...xs),
-      y: Math.min(...ys),
-      width: Math.max(...xs) - Math.min(...xs),
-      height: Math.max(...ys) - Math.min(...ys)
-    };
-  }
-
-  if (shape.type === "line" || shape.type === "arrow") {
+  if (shape.type === "arrow") {
     const x2 = shape.x + shape.width;
     const y2 = shape.y + shape.height;
     return {
@@ -100,148 +58,194 @@ function shapeBounds(shape: DiagramShape) {
     };
   }
 
-  return normalizeShape(shape);
+  return {
+    x: shape.x,
+    y: shape.y,
+    width: shape.width,
+    height: shape.height
+  };
+}
+
+function centerOf(shape: DiagramShape): Point {
+  const bounds = shapeBounds(shape);
+  return {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2
+  };
 }
 
 function shapeContains(shape: DiagramShape, point: Point) {
   const bounds = shapeBounds(shape);
-  return point.x >= bounds.x - 8
-    && point.x <= bounds.x + bounds.width + 8
-    && point.y >= bounds.y - 8
-    && point.y <= bounds.y + bounds.height + 8;
+  return point.x >= bounds.x - 10
+    && point.x <= bounds.x + bounds.width + 10
+    && point.y >= bounds.y - 10
+    && point.y <= bounds.y + bounds.height + 10;
 }
 
-function centerLabel(shape: DiagramShape) {
-  return {
-    x: shape.x + shape.width / 2,
-    y: shape.y + shape.height / 2
-  };
+function findShapeAt(shapes: DiagramShape[], point: Point) {
+  return [...shapes]
+    .reverse()
+    .find((shape) => shape.type !== "arrow" && shapeContains(shape, point));
 }
 
 function displayLabel(label: string) {
   return label.length > 24 ? `${label.slice(0, 21)}...` : label;
 }
 
+function defaultSize(kind: PrimitiveKind) {
+  if (kind === "model" || kind === "human-review") return { width: 190, height: 92, type: "ellipse" as const };
+  return { width: 190, height: 86, type: "rect" as const };
+}
+
+function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
+  const source = shapes.find((candidate) => candidate.id === shape.sourceId);
+  const target = shapes.find((candidate) => candidate.id === shape.targetId);
+
+  if (source && target) {
+    const start = centerOf(source);
+    const end = centerOf(target);
+    return { start, end };
+  }
+
+  return {
+    start: { x: shape.x, y: shape.y },
+    end: { x: shape.x + shape.width, y: shape.y + shape.height }
+  };
+}
+
 export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
-  const [tool, setTool] = useState<Tool>("rect");
-  const [color, setColor] = useState(palette[0]);
-  const [draft, setDraft] = useState<DiagramShape | null>(null);
+  const [tool, setTool] = useState<Tool>("select");
+  const [componentKind, setComponentKind] = useState<PrimitiveKind>("service");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
+  const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  const visibleShapes = useMemo(() => (draft ? [...shapes, draft] : shapes), [draft, shapes]);
   const selectedShape = shapes.find((shape) => shape.id === selectedId) ?? null;
+  const connectorSource = shapes.find((shape) => shape.id === connectorSourceId) ?? null;
+  const activeKind = componentKinds.find((kind) => kind.kind === componentKind) ?? componentKinds[0];
+  const ActiveKindIcon = activeKind.icon;
+
+  const canvasClass = useMemo(() => (
+    tool === "select" ? "drawing-surface selecting" : "drawing-surface"
+  ), [tool]);
 
   function toCanvasPoint(event: React.PointerEvent<SVGSVGElement>) {
-    const rect = svgRef.current!.getBoundingClientRect();
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * 1200,
-      y: ((event.clientY - rect.top) / rect.height) * 760
-    };
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const transformed = point.matrixTransform(svg.getScreenCTM()?.inverse());
+    return { x: transformed.x, y: transformed.y };
   }
 
-  function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    const point = toCanvasPoint(event);
-
-    if (tool === "select") {
-      const hit = [...shapes].reverse().find((shape) => shapeContains(shape, point));
-      setSelectedId(hit?.id ?? null);
-      if (hit) setColor(hit.color);
-      setDragStart(hit ? point : null);
-      if (hit) {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
-      return;
-    }
-
+  function addComponent(point: Point) {
+    const size = defaultSize(componentKind);
     const next: DiagramShape = {
       id: crypto.randomUUID(),
-      type: tool,
-      x: point.x,
-      y: point.y,
-      width: tool === "note" ? 170 : 0,
-      height: tool === "note" ? 88 : 0,
-      color,
-      label: tool === "note" ? "Note" : undefined,
-      points: tool === "freehand" ? [point] : undefined
-    };
-    setSelectedId(null);
-    setDraft(next);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    if (tool === "select" && selectedId && dragStart) {
-      const point = toCanvasPoint(event);
-      const dx = point.x - dragStart.x;
-      const dy = point.y - dragStart.y;
-      setShapes((currentShapes) => currentShapes.map((shape) => {
-        if (shape.id !== selectedId) return shape;
-        if (shape.type === "freehand") {
-          return {
-            ...shape,
-            x: shape.x + dx,
-            y: shape.y + dy,
-            points: shape.points?.map((freehandPoint) => ({
-              x: freehandPoint.x + dx,
-              y: freehandPoint.y + dy
-            }))
-          };
-        }
-        return { ...shape, x: shape.x + dx, y: shape.y + dy };
-      }));
-      setDragStart(point);
-      return;
-    }
-
-    if (!draft) return;
-    const point = toCanvasPoint(event);
-    if (draft.type === "freehand") {
-      setDraft({ ...draft, points: [...(draft.points ?? []), point] });
-      return;
-    }
-    setDraft({
-      ...draft,
-      width: point.x - draft.x,
-      height: point.y - draft.y
-    });
-  }
-
-  function onPointerUp() {
-    if (tool === "select") {
-      setDragStart(null);
-      return;
-    }
-
-    if (!draft) return;
-    const normalized = normalizeShape(draft);
-    const hasSize = normalized.type === "freehand"
-      ? (normalized.points?.length ?? 0) > 2
-      : normalized.width > 8 || normalized.height > 8 || normalized.type === "note";
-    if (hasSize) {
-      setShapes((currentShapes) => [...currentShapes, normalized]);
-    }
-    setDraft(null);
-  }
-
-  function addPrimitive(kind: PrimitiveKind, label: string, primitiveColor: string) {
-    const offset = shapes.length * 18;
-    const next: DiagramShape = {
-      id: crypto.randomUUID(),
-      type: kind === "model" || kind === "human-review" ? "ellipse" : "rect",
-      primitive: kind,
-      x: 120 + (offset % 280),
-      y: 110 + (offset % 180),
-      width: 180,
-      height: 84,
-      color: primitiveColor,
-      label
+      type: size.type,
+      primitive: componentKind,
+      x: point.x - size.width / 2,
+      y: point.y - size.height / 2,
+      width: size.width,
+      height: size.height,
+      color: componentColor,
+      label: activeKind.label
     };
     setShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(next.id);
     setTool("select");
-    setColor(primitiveColor);
+  }
+
+  function addNote(point: Point) {
+    const next: DiagramShape = {
+      id: crypto.randomUUID(),
+      type: "note",
+      x: point.x - 100,
+      y: point.y - 44,
+      width: 200,
+      height: 88,
+      color: noteColor,
+      label: "Note"
+    };
+    setShapes((currentShapes) => [...currentShapes, next]);
+    setSelectedId(next.id);
+    setTool("select");
+  }
+
+  function addConnector(target: DiagramShape) {
+    if (!connectorSourceId || connectorSourceId === target.id) return;
+    const source = shapes.find((shape) => shape.id === connectorSourceId);
+    if (!source) return;
+    const start = centerOf(source);
+    const end = centerOf(target);
+    const next: DiagramShape = {
+      id: crypto.randomUUID(),
+      type: "arrow",
+      x: start.x,
+      y: start.y,
+      width: end.x - start.x,
+      height: end.y - start.y,
+      color: connectorColor,
+      sourceId: source.id,
+      targetId: target.id
+    };
+    setShapes((currentShapes) => [...currentShapes, next]);
+    setSelectedId(next.id);
+    setConnectorSourceId(null);
+    setTool("select");
+  }
+
+  function onPointerDown(event: React.PointerEvent<SVGSVGElement>) {
+    const point = toCanvasPoint(event);
+    const hit = findShapeAt(shapes, point);
+
+    if (tool === "component") {
+      addComponent(point);
+      return;
+    }
+
+    if (tool === "note") {
+      addNote(point);
+      return;
+    }
+
+    if (tool === "connector") {
+      if (!hit) return;
+      if (!connectorSourceId) {
+        setConnectorSourceId(hit.id);
+        setSelectedId(hit.id);
+        return;
+      }
+      addConnector(hit);
+      return;
+    }
+
+    setSelectedId(hit?.id ?? null);
+    setDragStart(hit ? point : null);
+    if (hit) event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (tool !== "select" || !selectedId || !dragStart) return;
+    const point = toCanvasPoint(event);
+    const dx = point.x - dragStart.x;
+    const dy = point.y - dragStart.y;
+    setShapes((currentShapes) => currentShapes.map((shape) => {
+      if (shape.id !== selectedId) return shape;
+      return { ...shape, x: shape.x + dx, y: shape.y + dy };
+    }));
+    setDragStart(point);
+  }
+
+  function onPointerUp() {
+    setDragStart(null);
+  }
+
+  function selectTool(nextTool: Tool) {
+    setTool(nextTool);
+    if (nextTool !== "connector") setConnectorSourceId(null);
   }
 
   function updateSelectedLabel(label: string) {
@@ -251,60 +255,46 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
     )));
   }
 
-  function recolorSelected(nextColor: string) {
-    setColor(nextColor);
-    if (!selectedId) return;
-    setShapes((currentShapes) => currentShapes.map((shape) => (
-      shape.id === selectedId ? { ...shape, color: nextColor } : shape
-    )));
-  }
-
   function deleteSelected() {
     if (!selectedId) return;
-    setShapes((currentShapes) => currentShapes.filter((shape) => shape.id !== selectedId));
+    setShapes((currentShapes) => currentShapes.filter((shape) => (
+      shape.id !== selectedId && shape.sourceId !== selectedId && shape.targetId !== selectedId
+    )));
     setSelectedId(null);
   }
 
   function undoLastShape() {
     const nextShapes = shapes.slice(0, -1);
     setShapes(nextShapes);
-    if (!nextShapes.some((shape) => shape.id === selectedId)) {
-      setSelectedId(null);
-    }
+    if (!nextShapes.some((shape) => shape.id === selectedId)) setSelectedId(null);
   }
 
   function clearShapes() {
     setShapes([]);
     setSelectedId(null);
+    setConnectorSourceId(null);
+    setTool("select");
   }
 
   return (
-    <section className="board-panel" aria-label="Architecture diagram board">
-      <div className="board-toolbar">
-        <div className="tool-strip" aria-label="Diagram tools">
-          {tools.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              className={tool === id ? "icon-button active" : "icon-button"}
-              onClick={() => setTool(id)}
-              title={label}
-              type="button"
-            >
-              <Icon size={18} />
-            </button>
-          ))}
-        </div>
-        <div className="swatches" aria-label="Colors">
-          {palette.map((swatch) => (
-            <button
-              key={swatch}
-              className={(selectedShape?.color ?? color) === swatch ? "swatch active" : "swatch"}
-              onClick={() => recolorSelected(swatch)}
-              style={{ background: swatch }}
-              title={swatch}
-              type="button"
-            />
-          ))}
+    <section className="board-panel simple-board" aria-label="Architecture diagram board">
+      <div className="board-toolbar simple-toolbar">
+        <div className="tool-strip" aria-label="Diagram actions">
+          <button className={tool === "select" ? "icon-button active" : "icon-button"} onClick={() => selectTool("select")} title="Pointer" type="button">
+            <MousePointer2 size={18} />
+          </button>
+          <button className={tool === "component" ? "tool-button active" : "tool-button"} onClick={() => selectTool("component")} type="button">
+            <ActiveKindIcon size={16} />
+            Add component
+          </button>
+          <button className={tool === "connector" ? "tool-button active" : "tool-button"} onClick={() => selectTool("connector")} type="button">
+            <ArrowRight size={16} />
+            Connect
+          </button>
+          <button className={tool === "note" ? "tool-button active" : "tool-button"} onClick={() => selectTool("note")} type="button">
+            <StickyNote size={16} />
+            Note
+          </button>
         </div>
         <div className="tool-actions">
           <button className="icon-button" onClick={undoLastShape} title="Undo" type="button">
@@ -318,22 +308,24 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           </button>
         </div>
       </div>
-      <div className="primitive-toolbar" aria-label="System design primitives">
-        {primitiveButtons.map(({ kind, label, icon: Icon, color: primitiveColor }) => (
-          <button key={kind} className="primitive-button" onClick={() => addPrimitive(kind, label, primitiveColor)} type="button">
-            <Icon size={16} />
+
+      <div className="component-toolbar" aria-label="Component types">
+        {componentKinds.map(({ kind, label, icon: Icon }) => (
+          <button key={kind} className={componentKind === kind ? "component-chip active" : "component-chip"} onClick={() => { setComponentKind(kind); selectTool("component"); }} type="button">
+            <Icon size={15} />
             {label}
           </button>
         ))}
       </div>
+
       <div className="selection-bar">
         <label>
           Selected label
           <input
             value={selectedShape?.label ?? ""}
             onChange={(event) => updateSelectedLabel(event.target.value)}
-            placeholder="Select a shape to label it"
-            disabled={!selectedShape || selectedShape.type === "freehand" || selectedShape.type === "line" || selectedShape.type === "arrow"}
+            placeholder={connectorSource ? `Connecting from ${connectorSource.label ?? "selected component"}` : "Select a component or note"}
+            disabled={!selectedShape || selectedShape.type === "arrow"}
           />
         </label>
         <button className="secondary-button" onClick={deleteSelected} disabled={!selectedShape} type="button">
@@ -341,9 +333,10 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           Delete
         </button>
       </div>
+
       <svg
         ref={svgRef}
-        className={tool === "select" ? "drawing-surface selecting" : "drawing-surface"}
+        className={canvasClass}
         viewBox="0 0 1200 760"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -355,33 +348,34 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           </pattern>
         </defs>
         <rect width="1200" height="760" fill="url(#grid)" />
-        {visibleShapes.map((shape) => {
-          const shapeForDisplay = normalizeShape(shape);
-          const stroke = shape.color;
+        {connectorSource && (
+          <circle cx={centerOf(connectorSource).x} cy={centerOf(connectorSource).y} r="9" fill="#0f766e" />
+        )}
+        {shapes.map((shape) => {
           const selected = shape.id === selectedId;
-          if (shapeForDisplay.type === "rect") {
-            const label = centerLabel(shapeForDisplay);
+          if (shape.type === "rect") {
+            const label = centerOf(shape);
             return (
               <g key={shape.id}>
-                <rect x={shapeForDisplay.x} y={shapeForDisplay.y} width={shapeForDisplay.width} height={shapeForDisplay.height} rx="6" fill="#ffffff" stroke={stroke} strokeWidth={selected ? "5" : "3"} />
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={selected ? "5" : "3"} />
                 {shape.label && <text x={label.x} y={label.y + 7} textAnchor="middle" fill="#1f2937" fontSize="22" fontWeight="800"><title>{shape.label}</title>{displayLabel(shape.label)}</text>}
               </g>
             );
           }
-          if (shapeForDisplay.type === "ellipse") {
-            const label = centerLabel(shapeForDisplay);
+          if (shape.type === "ellipse") {
+            const label = centerOf(shape);
             return (
               <g key={shape.id}>
-                <ellipse cx={shapeForDisplay.x + shapeForDisplay.width / 2} cy={shapeForDisplay.y + shapeForDisplay.height / 2} rx={Math.abs(shapeForDisplay.width / 2)} ry={Math.abs(shapeForDisplay.height / 2)} fill="#ffffff" stroke={stroke} strokeWidth={selected ? "5" : "3"} />
+                <ellipse cx={label.x} cy={label.y} rx={Math.abs(shape.width / 2)} ry={Math.abs(shape.height / 2)} fill="#ffffff" stroke={componentColor} strokeWidth={selected ? "5" : "3"} />
                 {shape.label && <text x={label.x} y={label.y + 7} textAnchor="middle" fill="#1f2937" fontSize="22" fontWeight="800"><title>{shape.label}</title>{displayLabel(shape.label)}</text>}
               </g>
             );
           }
-          if (shapeForDisplay.type === "note") {
+          if (shape.type === "note") {
             return (
               <g key={shape.id}>
-                <rect x={shapeForDisplay.x} y={shapeForDisplay.y} width={shapeForDisplay.width} height={shapeForDisplay.height} rx="6" fill="#fff7d6" stroke={stroke} strokeWidth={selected ? "5" : "3"} />
-                <text x={shapeForDisplay.x + 14} y={shapeForDisplay.y + 32} fill="#1f2937" fontSize="22" fontWeight="700">
+                <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#fff7d6" stroke={noteColor} strokeWidth={selected ? "5" : "3"} />
+                <text x={shape.x + 14} y={shape.y + 32} fill="#1f2937" fontSize="22" fontWeight="700">
                   {shape.label && <title>{shape.label}</title>}
                   {shape.label ? displayLabel(shape.label) : ""}
                 </text>
@@ -390,21 +384,19 @@ export function DiagramBoard({ shapes, setShapes }: DiagramBoardProps) {
           }
           if (shape.type === "arrow") {
             const markerId = `arrowhead-${shape.id}`;
+            const endpoints = connectorEndpoints(shape, shapes);
             return (
               <g key={shape.id}>
                 <defs>
                   <marker id={markerId} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-                    <path d="M 0 0 L 8 3 L 0 6 z" fill={stroke} />
+                    <path d="M 0 0 L 8 3 L 0 6 z" fill={connectorColor} />
                   </marker>
                 </defs>
-                <line x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={stroke} strokeWidth={selected ? "6" : "4"} markerEnd={`url(#${markerId})`} />
+                <line x1={endpoints.start.x} y1={endpoints.start.y} x2={endpoints.end.x} y2={endpoints.end.y} stroke={connectorColor} strokeWidth={selected ? "6" : "4"} markerEnd={`url(#${markerId})`} />
               </g>
             );
           }
-          if (shape.type === "line") {
-            return <line key={shape.id} x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={stroke} strokeWidth={selected ? "6" : "4"} strokeLinecap="round" />;
-          }
-          return <path key={shape.id} d={pointsToPath(shape.points)} fill="none" stroke={stroke} strokeWidth={selected ? "6" : "4"} strokeLinecap="round" strokeLinejoin="round" />;
+          return null;
         })}
       </svg>
     </section>

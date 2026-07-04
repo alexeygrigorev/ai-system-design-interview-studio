@@ -23,6 +23,8 @@ interface DiagramArtifact {
   bounds?: Bounds;
   start?: Point;
   end?: Point;
+  sourceId?: string;
+  targetId?: string;
   warnings: string[];
 }
 
@@ -215,6 +217,8 @@ function parseArtifact(value: unknown, index: number): DiagramArtifact {
   const primitive = readString(value, "primitive");
   const label = readString(value, "label");
   const color = readString(value, "color");
+  const sourceId = readString(value, "sourceId");
+  const targetId = readString(value, "targetId");
   const x = readNumber(value, "x");
   const y = readNumber(value, "y");
   const width = readNumber(value, "width");
@@ -254,6 +258,8 @@ function parseArtifact(value: unknown, index: number): DiagramArtifact {
     bounds,
     start,
     end,
+    sourceId,
+    targetId,
     warnings
   };
 }
@@ -335,7 +341,16 @@ function formatRelationships(arrows: DiagramArtifact[], connectableArtifacts: Di
   if (!arrows.length) return { lines: ["- None detected."], connectedIds: new Set<string>() };
 
   const connectedIds = new Set<string>();
+  const byId = new Map(connectableArtifacts.map((artifact) => [artifact.id, artifact]));
   const lines = [...arrows].sort(compareArtifacts).map((arrow) => {
+    const explicitSource = arrow.sourceId ? byId.get(arrow.sourceId) : undefined;
+    const explicitTarget = arrow.targetId ? byId.get(arrow.targetId) : undefined;
+    if (explicitSource && explicitTarget) {
+      connectedIds.add(explicitSource.id);
+      connectedIds.add(explicitTarget.id);
+      return `- Arrow ${quoteText(arrow.id)}: ${connectionLabel(explicitSource)} -> ${connectionLabel(explicitTarget)}; sourceId=${quoteText(explicitSource.id)}; targetId=${quoteText(explicitTarget.id)}; relationship is explicitly attached in the canvas.`;
+    }
+
     if (!arrow.start || !arrow.end) {
       return `- Arrow ${quoteText(arrow.id)}: unresolved because endpoint coordinates are incomplete; ${artifactDisplay(arrow)}`;
     }

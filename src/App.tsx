@@ -1,9 +1,9 @@
-import { AlertCircle, Bot, CheckCircle2, Loader2, Play, RotateCcw, Send, Sparkles, Wifi } from "lucide-react";
+import { AlertCircle, Bot, Loader2, Play, RotateCcw, Send, Sparkles, Wifi } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getHealth, requestAssessment, requestInterviewTurn, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
-import { phaseGuide, processGates, topicBank } from "./questionBank";
-import type { CandidateLevel, ChatMessage, DiagramShape, FeedbackMode, Persona, SessionConfig } from "./types";
+import { topicBank } from "./questionBank";
+import type { CandidateLevel, ChatMessage, DiagramShape, Persona, SessionConfig } from "./types";
 
 const defaultConstraints = [
   "Must handle private data safely",
@@ -14,8 +14,7 @@ const defaultConstraints = [
 function App() {
   const [level, setLevel] = useState<CandidateLevel>("senior");
   const [duration, setDuration] = useState(45);
-  const [persona, setPersona] = useState<Persona>("neutral");
-  const [feedbackMode, setFeedbackMode] = useState<FeedbackMode>("end_only");
+  const [persona, setPersona] = useState<Persona | "random">("neutral");
   const [topic, setTopic] = useState(topicBank[0]);
   const [constraintText, setConstraintText] = useState(defaultConstraints.join("\n"));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -25,18 +24,21 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [screen, setScreen] = useState<"setup" | "interview">("setup");
+  const [activePersona, setActivePersona] = useState<Persona>("neutral");
+  const [activeTopic, setActiveTopic] = useState(topicBank[0]);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
     duration,
-    persona,
-    feedbackMode,
-    topic,
+    persona: activePersona,
+    feedbackMode: "end_only",
+    topic: activeTopic,
     constraints: constraintText
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
-  }), [constraintText, duration, feedbackMode, level, persona, topic]);
+  }), [activePersona, activeTopic, constraintText, duration, level]);
 
   const providerReady = Boolean(health?.ok && health.ready);
   const providerStatusClass = !health
@@ -92,10 +94,21 @@ function App() {
   }, []);
 
   async function startInterview() {
+    const resolvedTopic = topic === "__random__"
+      ? topicBank[Math.floor(Math.random() * topicBank.length)]
+      : topic;
+    const personas: Persona[] = ["supportive", "neutral", "adversarial"];
+    const resolvedPersona = persona === "random"
+      ? personas[Math.floor(Math.random() * personas.length)]
+      : persona;
+
+    setActiveTopic(resolvedTopic);
+    setActivePersona(resolvedPersona);
     setBusy(true);
     setError("");
     setAssessment("");
     setMessages([]);
+    setShapes([]);
     const providerError = missingProviderMessage();
     if (providerError) {
       setError(providerError);
@@ -103,8 +116,15 @@ function App() {
       return;
     }
     try {
-      const { reply } = await requestInterviewTurn(session, [], shapes);
+      const nextSession: SessionConfig = {
+        ...session,
+        topic: resolvedTopic,
+        persona: resolvedPersona,
+        feedbackMode: "end_only"
+      };
+      const { reply } = await requestInterviewTurn(nextSession, [], []);
       setMessages([{ role: "assistant", content: reply }]);
+      setScreen("interview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start interview");
     } finally {
@@ -159,101 +179,106 @@ function App() {
     setAnswer("");
     setAssessment("");
     setError("");
+    setShapes([]);
+    setScreen("setup");
+  }
+
+  function renderProviderStatus() {
+    return (
+      <div className={providerStatusClass}>
+        {providerReady ? <Wifi size={16} /> : health ? <AlertCircle size={16} /> : <Loader2 className="spin" size={16} />}
+        <span>{providerStatusText}</span>
+      </div>
+    );
+  }
+
+  if (screen === "setup") {
+    return (
+      <main className="setup-screen">
+        <section className="setup-workspace">
+          <div className="brand-row">
+            <div className="brand-mark"><Bot size={22} /></div>
+            <div>
+              <h1>AI System Design Trainer</h1>
+              <p>Choose the interview, then work in a focused canvas and transcript.</p>
+            </div>
+          </div>
+
+          {renderProviderStatus()}
+          {error && <div className="error-box">{error}</div>}
+
+          <label>
+            Question
+            <select value={topic} onChange={(event) => setTopic(event.target.value)}>
+              <option value="__random__">Random question</option>
+              {topicBank.map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </label>
+
+          <label>
+            Interviewer
+            <select value={persona} onChange={(event) => setPersona(event.target.value as Persona | "random")}>
+              <option value="random">Random interviewer</option>
+              <option value="supportive">Supportive coach</option>
+              <option value="neutral">Neutral evaluator</option>
+              <option value="adversarial">Adversarial challenger</option>
+            </select>
+          </label>
+
+          <details className="advanced-settings">
+            <summary>Session settings</summary>
+            <div className="field-grid">
+              <label>
+                Level
+                <select value={level} onChange={(event) => setLevel(event.target.value as CandidateLevel)}>
+                  <option value="junior">Junior</option>
+                  <option value="mid-level">Mid-level</option>
+                  <option value="senior">Senior</option>
+                  <option value="staff">Staff</option>
+                </select>
+              </label>
+              <label>
+                Minutes
+                <select value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+                  <option value={30}>30</option>
+                  <option value={45}>45</option>
+                  <option value={60}>60</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Constraints
+              <textarea value={constraintText} onChange={(event) => setConstraintText(event.target.value)} rows={4} />
+            </label>
+          </details>
+
+          <button className="primary-button setup-start" onClick={startInterview} disabled={busy || !providerReady} type="button">
+            {busy ? <Loader2 className="spin" size={17} /> : <Play size={17} />}
+            Start interview
+          </button>
+        </section>
+      </main>
+    );
   }
 
   return (
-    <main className="app-shell">
-      <aside className="setup-panel">
-        <div className="brand-row">
-          <div className="brand-mark"><Bot size={22} /></div>
-          <div>
-            <h1>AI System Design Trainer</h1>
-            <p>Practice production AI architecture interviews.</p>
-          </div>
+    <main className="interview-shell">
+      <header className="interview-header">
+        <div>
+          <h1>AI System Design Interview</h1>
+          <p>{activeTopic}</p>
         </div>
-
-        <div className={providerStatusClass}>
-          {providerReady ? <Wifi size={16} /> : health ? <AlertCircle size={16} /> : <Loader2 className="spin" size={16} />}
-          <span>{providerStatusText}</span>
+        <div className="session-summary">
+          <span>{activePersona.replace("-", " ")}</span>
+          <span>{level}</span>
+          <span>{duration} min</span>
         </div>
-
-        <label>
-          Topic
-          <select value={topic} onChange={(event) => setTopic(event.target.value)}>
-            {topicBank.map((item) => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-
-        <div className="field-grid">
-          <label>
-            Level
-            <select value={level} onChange={(event) => setLevel(event.target.value as CandidateLevel)}>
-              <option value="junior">Junior</option>
-              <option value="mid-level">Mid-level</option>
-              <option value="senior">Senior</option>
-              <option value="staff">Staff</option>
-            </select>
-          </label>
-          <label>
-            Minutes
-            <select value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-              <option value={30}>30</option>
-              <option value={45}>45</option>
-              <option value={60}>60</option>
-            </select>
-          </label>
-        </div>
-
-        <label>
-          Interviewer
-          <select value={persona} onChange={(event) => setPersona(event.target.value as Persona)}>
-            <option value="supportive">Supportive coach</option>
-            <option value="neutral">Neutral evaluator</option>
-            <option value="adversarial">Adversarial challenger</option>
-          </select>
-        </label>
-
-        <label>
-          Feedback
-          <select value={feedbackMode} onChange={(event) => setFeedbackMode(event.target.value as FeedbackMode)}>
-            <option value="end_only">End only</option>
-            <option value="midpoint_and_end">Midpoint and end</option>
-            <option value="coaching_after_sections">Coaching after sections</option>
-          </select>
-        </label>
-
-        <label>
-          Constraints
-          <textarea value={constraintText} onChange={(event) => setConstraintText(event.target.value)} rows={5} />
-        </label>
-
-        <div className="action-row">
-          <button className="primary-button" onClick={startInterview} disabled={busy} type="button">
-            {busy ? <Loader2 className="spin" size={17} /> : <Play size={17} />}
-            Start
-          </button>
-          <button className="secondary-button" onClick={resetSession} disabled={busy} type="button">
-            <RotateCcw size={17} />
-            Reset
-          </button>
-        </div>
-
-        <section className="compact-section">
-          <h2>Interview Phases</h2>
-          <div className="phase-list">
-            {phaseGuide.map((phase) => <span key={phase}>{phase}</span>)}
-          </div>
-        </section>
-
-        <section className="compact-section">
-          <h2>Shipping Gates</h2>
-          <div className="gate-list">
-            {processGates.map((gate) => (
-              <span key={gate}><CheckCircle2 size={14} />{gate}</span>
-            ))}
-          </div>
-        </section>
-      </aside>
+        {renderProviderStatus()}
+        <button className="secondary-button" onClick={resetSession} disabled={busy} type="button">
+          <RotateCcw size={17} />
+          New session
+        </button>
+      </header>
 
       <section className="workspace">
         <DiagramBoard shapes={shapes} setShapes={setShapes} />
@@ -263,11 +288,11 @@ function App() {
         <div className="panel-heading">
           <div>
             <h2>Interview</h2>
-            <p>{messages.length ? `${messages.length} transcript turns` : "Start when ready"}</p>
+            <p>{messages.length ? `${messages.length} transcript turns` : "Starting..."}</p>
           </div>
           <button className="assess-button" onClick={finishInterview} disabled={busy || messages.length === 0} type="button">
             <Sparkles size={16} />
-            Assess
+            Evaluate
           </button>
         </div>
 
@@ -308,7 +333,7 @@ function App() {
 
         {assessment && (
           <section className="assessment">
-            <h2>Final Feedback</h2>
+            <h2>Evaluation and Improvements</h2>
             <pre>{assessment}</pre>
           </section>
         )}

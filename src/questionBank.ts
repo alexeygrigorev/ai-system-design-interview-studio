@@ -16,26 +16,3 @@ export const topicBank = [
   "Design a scalable image-generation pipeline for millions of users.",
   "Design a large-scale AI model deployment platform with model serving, routing, caching, and rollback."
 ];
-
-export const phaseGuide = [
-  "Opening",
-  "Clarification",
-  "Metrics",
-  "Architecture",
-  "AI approach",
-  "Context/data",
-  "Tools/agents",
-  "Evaluation",
-  "Production",
-  "Safety",
-  "Wrap-up"
-];
-
-export const processGates = [
-  "Intake",
-  "Grooming",
-  "Implementation",
-  "Tester verification",
-  "PM acceptance",
-  "Ship and monitor"
-];
