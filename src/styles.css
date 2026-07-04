@@ -297,11 +297,14 @@ button:disabled {
   display: block;
   height: 100%;
   touch-action: none;
+  user-select: none;
   width: 100%;
 }
 
 .drawing-surface text {
   font-family: inherit;
+  pointer-events: none;
+  user-select: none;
 }
 
 .drawing-surface.selecting {
