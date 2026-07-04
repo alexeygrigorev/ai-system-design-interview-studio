@@ -1,4 +1,4 @@
-import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, Redo2, RotateCcw, Send, Trash2, Undo2, User } from "lucide-react";
+import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, Moon, MoreVertical, Play, Redo2, RotateCcw, Send, Sun, Trash2, Undo2, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -6,6 +6,19 @@ import { interviewProblems } from "./questionBank";
 import type { CandidateLevel, ChatMessage, DiagramShape, InterviewBrief, Persona, SessionConfig } from "./types";
 
 const SESSION_STORAGE_KEY = "ai-system-design-trainer.session.v1";
+const THEME_STORAGE_KEY = "ai-system-design-trainer.theme.v1";
+const SVG_THEME_VARIABLES = [
+  "--canvas-bg",
+  "--diagram-component",
+  "--diagram-component-strong",
+  "--diagram-grid",
+  "--diagram-handle",
+  "--diagram-node-accent",
+  "--diagram-node-bg",
+  "--diagram-note",
+  "--note-bg",
+  "--text-strong"
+];
 
 interface PersistedState {
   level: CandidateLevel;
@@ -221,8 +234,21 @@ function loadPersistedState(): Partial<PersistedState> {
   }
 }
 
+function loadPersistedTheme() {
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark";
+}
+
+function exportedSvgThemeCss() {
+  const styles = window.getComputedStyle(document.documentElement);
+  const declarations = SVG_THEME_VARIABLES
+    .map((name) => `${name}: ${styles.getPropertyValue(name).trim()};`)
+    .join(" ");
+  return `svg { ${declarations} background: ${styles.getPropertyValue("--canvas-bg").trim()}; }`;
+}
+
 function App() {
   const [persistedState] = useState(loadPersistedState);
+  const [darkMode, setDarkMode] = useState(loadPersistedTheme);
   const [level, setLevel] = useState<CandidateLevel>(persistedState.level ?? "senior");
   const [duration, setDuration] = useState(persistedState.duration ?? 45);
   const [persona, setPersona] = useState<Persona | "random">(persistedState.persona ?? "random");
@@ -292,6 +318,16 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
+    window.localStorage.setItem(THEME_STORAGE_KEY, darkMode ? "dark" : "light");
+  }, [darkMode]);
+
+  function toggleTheme() {
+    setDarkMode((current) => !current);
+  }
 
   useEffect(() => {
     const nextState: PersistedState = {
@@ -508,7 +544,7 @@ function App() {
     clone.setAttribute("width", String(Math.round(rect.width)));
     clone.setAttribute("height", String(Math.round(rect.height)));
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
-    style.textContent = "text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }";
+    style.textContent = `${exportedSvgThemeCss()} text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }`;
     clone.prepend(style);
     downloadTextFile(
       `${filenamePart(activeTopic)}-diagram.svg`,
@@ -564,6 +600,9 @@ function App() {
 
           <div className="setup-header">
             <h1>Interview setup</h1>
+            <button className="icon-button theme-toggle" onClick={toggleTheme} title={darkMode ? "Use light mode" : "Use dark mode"} type="button">
+              {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
           </div>
 
           <div className="field-grid">
@@ -676,6 +715,10 @@ function App() {
                   <button onClick={saveDiagramSvg} type="button">
                     <Download size={16} />
                     Save SVG
+                  </button>
+                  <button onClick={toggleTheme} type="button">
+                    {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+                    {darkMode ? "Light mode" : "Dark mode"}
                   </button>
                   <button className="danger" onClick={() => { closeSessionMenu(); clearCanvas(); }} type="button">
                     <Trash2 size={16} />
