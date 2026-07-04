@@ -43,6 +43,7 @@ export interface DiagramShape {
   height: number;
   color: string;
   label?: string;
+  indexKind?: "vector" | "text";
   points?: Point[];
   sourceId?: string;
   targetId?: string;

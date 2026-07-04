@@ -37,7 +37,7 @@ const componentKinds: Array<{ kind: PrimitiveKind; label: string; icon: typeof S
   { kind: "service", label: "Service", icon: Server },
   { kind: "datastore", label: "Datastore", icon: Database },
   { kind: "queue", label: "Queue", icon: Layers3 },
-  { kind: "vector-index", label: "Vector index", icon: Search },
+  { kind: "vector-index", label: "Index", icon: Search },
   { kind: "model", label: "Model", icon: Cpu },
   { kind: "tool", label: "Tool", icon: Wrench },
   { kind: "human-review", label: "Human review", icon: UserCheck }
@@ -90,11 +90,13 @@ function displayLabel(label: string) {
 }
 
 function defaultSize(kind: PrimitiveKind) {
-  if (kind === "user" || kind === "human-review") return { width: 170, height: 104, type: "ellipse" as const };
-  if (kind === "datastore") return { width: 178, height: 112, type: "rect" as const };
-  if (kind === "queue") return { width: 190, height: 104, type: "rect" as const };
-  if (kind === "model") return { width: 184, height: 96, type: "rect" as const };
-  return { width: 190, height: 86, type: "rect" as const };
+  if (kind === "user") return { width: 124, height: 90, type: "ellipse" as const };
+  if (kind === "human-review") return { width: 150, height: 90, type: "ellipse" as const };
+  if (kind === "datastore") return { width: 60, height: 168, type: "rect" as const };
+  if (kind === "queue") return { width: 184, height: 64, type: "rect" as const };
+  if (kind === "model") return { width: 176, height: 68, type: "rect" as const };
+  if (kind === "vector-index") return { width: 60, height: 168, type: "rect" as const };
+  return { width: 176, height: 64, type: "rect" as const };
 }
 
 function connectorEndpoints(shape: DiagramShape, shapes: DiagramShape[]) {
@@ -130,8 +132,10 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   const [dragStart, setDragStart] = useState<Point | null>(null);
   const [connectorDrag, setConnectorDrag] = useState<{ sourceId: string; start: Point; current: Point } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; point: Point; shapeId?: string } | null>(null);
+  const [indexChooser, setIndexChooser] = useState<{ x: number; y: number; shapeId: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
+  const [canvasViewBox, setCanvasViewBox] = useState({ width: 1200, height: 760 });
   const [undoStack, setUndoStack] = useState<DiagramShape[][]>([]);
   const [redoStack, setRedoStack] = useState<DiagramShape[][]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -189,7 +193,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setContextMenu(null);
   }
 
-  function addComponent(point: Point) {
+  function addComponent(point: Point, screenPoint?: Point) {
     const size = defaultSize(componentKind);
     const next: DiagramShape = {
       id: crypto.randomUUID(),
@@ -200,11 +204,17 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       width: size.width,
       height: size.height,
       color: componentColor,
-      label: activeKind.label
+      label: activeKind.label,
+      indexKind: componentKind === "vector-index" ? "vector" : undefined
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
     setSelectedId(next.id);
     setTool("select");
+    if (componentKind === "vector-index" && screenPoint) {
+      setIndexChooser({ x: screenPoint.x, y: screenPoint.y, shapeId: next.id });
+    } else {
+      setIndexChooser(null);
+    }
   }
 
   function addNote(point: Point) {
@@ -276,7 +286,8 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     const hit = findShapeAt(shapes, point);
 
     if (tool === "component") {
-      addComponent(point);
+      event.stopPropagation();
+      addComponent(point, { x: event.clientX, y: event.clientY });
       return;
     }
 
@@ -368,6 +379,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     setSelectedId(null);
     setConnectorDrag(null);
     setContextMenu(null);
+    setIndexChooser(null);
     setTool("select");
   }
 
@@ -411,6 +423,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     }
     setSelectedId(hit.id);
     setContextMenu({ x: event.clientX, y: event.clientY, point, shapeId: hit.id });
+    setIndexChooser(null);
   }
 
   function startConnectorDrag(event: React.PointerEvent<SVGCircleElement>, sourceId: string, start: Point) {
@@ -423,6 +436,21 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
   function addContextNote() {
     if (!contextMenu) return;
     addNote(contextMenu.point);
+    setContextMenu(null);
+  }
+
+  function chooseIndexKind(shapeId: string, indexKind: "vector" | "text") {
+    setShapes((currentShapes) => currentShapes.map((shape) => (
+      shape.id === shapeId ? { ...shape, indexKind, label: "Index" } : shape
+    )));
+    setIndexChooser(null);
+  }
+
+  function toggleIndexKind(shapeId: string) {
+    setShapes((currentShapes) => currentShapes.map((shape) => {
+      if (shape.id !== shapeId || shape.primitive !== "vector-index") return shape;
+      return { ...shape, indexKind: shape.indexKind === "text" ? "vector" : "text" };
+    }));
     setContextMenu(null);
   }
 
@@ -445,11 +473,13 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
         redo();
       }
       if (event.key === "Escape") setContextMenu(null);
+      if (event.key === "Escape") setIndexChooser(null);
       if (event.key === "Escape") cancelEditing();
     }
 
     function onPointerDown() {
       setContextMenu(null);
+      setIndexChooser(null);
     }
 
     window.addEventListener("keydown", onKeyDown);
@@ -466,7 +496,32 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     editorRef.current?.select();
   }, [editingId]);
 
+  useEffect(() => {
+    const currentSvg = svgRef.current;
+    if (!currentSvg) return;
+    const observedSvg = currentSvg;
+
+    function updateViewBox() {
+      const rect = observedSvg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const nextHeight = Math.round((1200 * rect.height) / rect.width);
+      setCanvasViewBox((current) => (
+        current.height === nextHeight ? current : { width: 1200, height: nextHeight }
+      ));
+    }
+
+    updateViewBox();
+    const observer = new ResizeObserver(updateViewBox);
+    observer.observe(observedSvg);
+    window.addEventListener("resize", updateViewBox);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateViewBox);
+    };
+  }, []);
+
   const editorPosition = editingShape ? toViewportPoint(centerOf(editingShape)) : null;
+  const contextShape = contextMenu?.shapeId ? shapes.find((shape) => shape.id === contextMenu.shapeId) : null;
 
   return (
     <section className="board-panel simple-board" aria-label="Architecture diagram board">
@@ -500,7 +555,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       <svg
         ref={svgRef}
         className={canvasClass}
-        viewBox="0 0 1200 760"
+        viewBox={`0 0 ${canvasViewBox.width} ${canvasViewBox.height}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -512,7 +567,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
             <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#d7dde7" strokeWidth="1" />
           </pattern>
         </defs>
-        <rect width="1200" height="760" fill="url(#grid)" />
+        <rect width={canvasViewBox.width} height={canvasViewBox.height} fill="url(#grid)" />
         {connectorDrag && (
           <line
             x1={connectorDrag.start.x}
@@ -531,47 +586,83 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           if (shape.type === "rect") {
             const labelText = shape.label ? displayLabel(shape.label) : "";
             if (shape.primitive === "datastore") {
-              const topY = shape.y + 22;
-              const bottomY = shape.y + shape.height - 20;
+              const visualWidth = Math.min(64, shape.width);
+              const visualHeight = Math.max(118, shape.height);
+              const visualX = label.x - visualWidth / 2;
+              const visualY = shape.y + (shape.height - visualHeight) / 2;
+              const topY = visualY + 16;
+              const bottomY = visualY + visualHeight - 22;
+              const ellipseRy = Math.min(14, visualWidth / 4);
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                   <path
-                    d={`M ${shape.x} ${topY} C ${shape.x} ${shape.y + 6}, ${shape.x + shape.width} ${shape.y + 6}, ${shape.x + shape.width} ${topY} L ${shape.x + shape.width} ${bottomY} C ${shape.x + shape.width} ${shape.y + shape.height - 6}, ${shape.x} ${shape.y + shape.height - 6}, ${shape.x} ${bottomY} Z`}
+                    d={`M ${visualX} ${topY} C ${visualX} ${visualY + 5}, ${visualX + visualWidth} ${visualY + 5}, ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY} C ${visualX + visualWidth} ${visualY + visualHeight - 9}, ${visualX} ${visualY + visualHeight - 9}, ${visualX} ${bottomY} Z`}
                     fill="#ffffff"
                     stroke={componentColor}
                     strokeWidth={strokeWidth}
                   />
-                  <ellipse cx={label.x} cy={topY} rx={shape.width / 2} ry="18" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  <path d={`M ${shape.x} ${bottomY} C ${shape.x} ${shape.y + shape.height - 6}, ${shape.x + shape.width} ${shape.y + shape.height - 6}, ${shape.x + shape.width} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
-                  {shape.label && <text x={label.x} y={label.y + 10} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  <ellipse cx={label.x} cy={topY} rx={visualWidth / 2} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${visualX} ${bottomY} C ${visualX} ${visualY + visualHeight - 9}, ${visualX + visualWidth} ${visualY + visualHeight - 9}, ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
+                  {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
 
             if (shape.primitive === "queue") {
+              const tubeHeight = Math.min(34, shape.height - 22);
+              const tubeWidth = Math.min(shape.width - 16, 150);
+              const tubeX = label.x - tubeWidth / 2;
+              const tubeY = shape.y + 10;
+              const endWidth = tubeHeight * 0.72;
+              const leftCx = tubeX + endWidth / 2;
+              const rightStart = tubeX + tubeWidth - endWidth / 2;
+              const cy = tubeY + tubeHeight / 2;
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
-                  <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  {[0, 1, 2].map((index) => (
-                    <rect key={index} x={shape.x + 22 + index * 48} y={shape.y + 18} width="38" height="30" rx="5" fill="#eef4ff" stroke={componentColor} strokeWidth="1.5" />
-                  ))}
-                  <path d={`M ${shape.x + 156} ${shape.y + 33} L ${shape.x + 170} ${shape.y + 33}`} stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
-                  <path d={`M ${shape.x + 164} ${shape.y + 25} L ${shape.x + 172} ${shape.y + 33} L ${shape.x + 164} ${shape.y + 41}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
-                  {shape.label && <text x={label.x} y={shape.y + shape.height - 17} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  <path
+                    d={`M ${leftCx} ${tubeY} H ${rightStart} C ${tubeX + tubeWidth + endWidth / 4} ${tubeY}, ${tubeX + tubeWidth + endWidth / 4} ${tubeY + tubeHeight}, ${rightStart} ${tubeY + tubeHeight} H ${leftCx} C ${tubeX} ${tubeY + tubeHeight}, ${tubeX} ${tubeY}, ${leftCx} ${tubeY} Z`}
+                    fill="#ffffff"
+                    stroke={componentColor}
+                    strokeWidth={strokeWidth}
+                  />
+                  <ellipse cx={leftCx} cy={cy} rx={endWidth / 2} ry={tubeHeight / 2} fill="#eef4ff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  {shape.label && <text x={label.x} y={shape.y + shape.height - 5} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
 
             if (shape.primitive === "vector-index") {
+              const visualWidth = Math.min(64, shape.width);
+              const visualHeight = Math.max(118, shape.height);
+              const visualX = label.x - visualWidth / 2;
+              const visualY = shape.y + (shape.height - visualHeight) / 2;
+              const topY = visualY + 16;
+              const bottomY = visualY + visualHeight - 22;
+              const ellipseRy = Math.min(14, visualWidth / 4);
               return (
                 <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
-                  <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="6" fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  <circle cx={shape.x + 42} cy={shape.y + 30} r="13" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
-                  <path d={`M ${shape.x + 52} ${shape.y + 40} L ${shape.x + 66} ${shape.y + 54}`} stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
-                  {[0, 1, 2].map((index) => (
-                    <line key={index} x1={shape.x + 86} y1={shape.y + 23 + index * 14} x2={shape.x + 158} y2={shape.y + 23 + index * 14} stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
-                  ))}
-                  {shape.label && <text x={label.x} y={shape.y + shape.height - 15} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  <path
+                    d={`M ${visualX} ${topY} C ${visualX} ${visualY + 5}, ${visualX + visualWidth} ${visualY + 5}, ${visualX + visualWidth} ${topY} L ${visualX + visualWidth} ${bottomY} C ${visualX + visualWidth} ${visualY + visualHeight - 9}, ${visualX} ${visualY + visualHeight - 9}, ${visualX} ${bottomY} Z`}
+                    fill="#ffffff"
+                    stroke={componentColor}
+                    strokeWidth={strokeWidth}
+                  />
+                  <ellipse cx={label.x} cy={topY} rx={visualWidth / 2} ry={ellipseRy} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
+                  <path d={`M ${visualX} ${bottomY} C ${visualX} ${visualY + visualHeight - 9}, ${visualX + visualWidth} ${visualY + visualHeight - 9}, ${visualX + visualWidth} ${bottomY}`} fill="none" stroke={componentColor} strokeWidth="1.5" />
+                  {shape.indexKind === "text" ? (
+                    <>
+                      <circle cx={label.x - 4} cy={label.y - 6} r="10" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
+                      <line x1={label.x + 4} y1={label.y + 2} x2={label.x + 15} y2={label.y + 13} stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
+                    </>
+                  ) : (
+                    <>
+                      <circle cx={label.x - 13} cy={label.y - 9} r="4" fill={componentColor} />
+                      <circle cx={label.x + 11} cy={label.y - 2} r="4" fill={componentColor} />
+                      <circle cx={label.x - 3} cy={label.y + 15} r="4" fill={componentColor} />
+                      <path d={`M ${label.x - 9} ${label.y - 8} L ${label.x + 7} ${label.y - 3} L ${label.x - 1} ${label.y + 11}`} fill="none" stroke={componentColor} strokeWidth="2" />
+                    </>
+                  )}
+                  {shape.label && <text x={label.x} y={visualY + visualHeight + 18} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
@@ -612,14 +703,24 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           }
           if (shape.type === "ellipse") {
             const labelText = shape.label ? displayLabel(shape.label) : "";
+            if (shape.primitive === "user") {
+              return (
+                <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
+                  {selected && <rect x={shape.x + 12} y={shape.y + 6} width={shape.width - 24} height={shape.height - 14} rx="8" fill="none" stroke={componentColor} strokeDasharray="5 5" strokeWidth="2" />}
+                  <circle cx={label.x} cy={shape.y + 24} r="12" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
+                  <path d={`M ${label.x - 24} ${shape.y + 59} C ${label.x - 16} ${shape.y + 42}, ${label.x + 16} ${shape.y + 42}, ${label.x + 24} ${shape.y + 59}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
+                  {shape.label && <text x={label.x} y={shape.y + shape.height - 8} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                </g>
+              );
+            }
             return (
               <g key={shape.id} onDoubleClick={(event) => startEditing(event, shape)}>
                 <ellipse cx={label.x} cy={label.y} rx={Math.abs(shape.width / 2)} ry={Math.abs(shape.height / 2)} fill="#ffffff" stroke={componentColor} strokeWidth={strokeWidth} />
-                {(shape.primitive === "user" || shape.primitive === "human-review") && (
+                {shape.primitive === "human-review" && (
                   <>
                     <circle cx={label.x} cy={shape.y + 31} r="12" fill="#eef4ff" stroke={componentColor} strokeWidth="2" />
                     <path d={`M ${label.x - 25} ${shape.y + 66} C ${label.x - 16} ${shape.y + 48}, ${label.x + 16} ${shape.y + 48}, ${label.x + 25} ${shape.y + 66}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeWidth="2.5" />
-                    {shape.primitive === "human-review" && <path d={`M ${shape.x + shape.width - 47} ${shape.y + 32} L ${shape.x + shape.width - 38} ${shape.y + 41} L ${shape.x + shape.width - 22} ${shape.y + 23}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />}
+                    <path d={`M ${shape.x + shape.width - 47} ${shape.y + 32} L ${shape.x + shape.width - 38} ${shape.y + 41} L ${shape.x + shape.width - 22} ${shape.y + 23}`} fill="none" stroke={componentColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
                   </>
                 )}
                 {shape.label && <text x={label.x} y={shape.y + shape.height - 15} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
@@ -682,12 +783,31 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
           aria-label="Edit component title"
         />
       )}
+      {indexChooser && (
+        <div className="canvas-context-menu index-kind-menu" style={{ left: indexChooser.x, top: indexChooser.y }} onPointerDown={(event) => event.stopPropagation()}>
+          <button onClick={() => chooseIndexKind(indexChooser.shapeId, "vector")} type="button">
+            Vector
+          </button>
+          <button onClick={() => chooseIndexKind(indexChooser.shapeId, "text")} type="button">
+            Text
+          </button>
+        </div>
+      )}
       {contextMenu && (
         <div className="canvas-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
           <button onClick={addContextNote} type="button">
             <StickyNote size={16} />
             Add note
           </button>
+          {contextMenu.shapeId && (
+            <>
+              {contextShape?.primitive === "vector-index" && (
+                <button onClick={() => toggleIndexKind(contextMenu.shapeId!)} type="button">
+                  {contextShape.indexKind === "text" ? "Switch to Vector" : "Switch to Text"}
+                </button>
+              )}
+            </>
+          )}
           {contextMenu.shapeId && (
             <button className="danger" onClick={deleteSelected} disabled={selectedId !== contextMenu.shapeId} type="button">
               <Trash2 size={16} />

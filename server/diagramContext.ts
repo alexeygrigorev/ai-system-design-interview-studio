@@ -18,6 +18,7 @@ interface DiagramArtifact {
   type: string;
   kind: DiagramArtifactKind;
   primitive?: string;
+  indexKind?: string;
   label?: string;
   color?: string;
   bounds?: Bounds;
@@ -138,6 +139,7 @@ function artifactSortLabel(artifact: DiagramArtifact) {
     sortValue(artifact.label),
     sortValue(artifact.id),
     sortValue(artifact.primitive),
+    sortValue(artifact.indexKind),
     artifact.type,
     sortValue(artifact.color),
     boundsSortLabel(artifact.bounds),
@@ -161,12 +163,16 @@ function simpleName(artifact: DiagramArtifact) {
 }
 
 function simpleKind(artifact: DiagramArtifact) {
+  if (artifact.primitive === "vector-index" && artifact.indexKind) {
+    return `${normalizeText(artifact.indexKind)} index`;
+  }
   return artifact.primitive ? normalizeText(artifact.primitive.replace("-", " ")) : artifact.kind;
 }
 
 function artifactDisplay(artifact: DiagramArtifact) {
   const parts = [`${artifact.kind} ${connectionLabel(artifact)}`, `type=${quoteText(artifact.type)}`];
   if (artifact.primitive) parts.push(`primitive=${quoteText(artifact.primitive)}`);
+  if (artifact.indexKind) parts.push(`indexKind=${quoteText(artifact.indexKind)}`);
   if (artifact.bounds) {
     parts.push(`bounds=x${formatNumber(artifact.bounds.x)},y${formatNumber(artifact.bounds.y)},w${formatNumber(artifact.bounds.width)},h${formatNumber(artifact.bounds.height)}`);
   }
@@ -222,6 +228,7 @@ function parseArtifact(value: unknown, index: number): DiagramArtifact {
   const type = readString(value, "type") ?? "unknown";
   const kind = classify(type);
   const primitive = readString(value, "primitive");
+  const indexKind = readString(value, "indexKind");
   const label = readString(value, "label");
   const color = readString(value, "color");
   const sourceId = readString(value, "sourceId");
@@ -260,6 +267,7 @@ function parseArtifact(value: unknown, index: number): DiagramArtifact {
     type,
     kind,
     primitive,
+    indexKind,
     label,
     color,
     bounds,
