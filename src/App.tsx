@@ -1,4 +1,4 @@
-import { Bot, Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
+import { Download, FileText, Lightbulb, ListRestart, Loader2, MessagesSquare, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHealth, requestInterviewBrief, requestInterviewTurnStream, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
@@ -235,6 +235,7 @@ function App() {
   const [cornerPanel, setCornerPanel] = useState<"hints" | "diagram" | null>(null);
   const [checkedHints, setCheckedHints] = useState<string[]>([]);
   const sessionMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const customProblemRef = useRef<HTMLTextAreaElement | null>(null);
 
   const session = useMemo<SessionConfig>(() => ({
     level,
@@ -324,6 +325,12 @@ function App() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [screen]);
+
+  useEffect(() => {
+    if (screen === "setup" && topic === "__custom__") {
+      customProblemRef.current?.focus();
+    }
+  }, [screen, topic]);
 
   function updateTopic(nextTopic: string) {
     setTopic(nextTopic);
@@ -490,15 +497,11 @@ function App() {
     return (
       <main className="setup-screen">
         <section className="setup-workspace">
-          <div className="brand-row">
-            <div className="brand-mark"><Bot size={22} /></div>
-            <div>
-              <h1>AI System Design Trainer</h1>
-              <p>Choose the interview, then work in a focused canvas and transcript.</p>
-            </div>
-          </div>
-
           {error && <div className="error-box">{error}</div>}
+
+          <div className="setup-header">
+            <h1>Interview setup</h1>
+          </div>
 
           <div className="field-grid">
             <label>
@@ -540,13 +543,14 @@ function App() {
           </label>
 
           {topic === "__custom__" && (
-            <label>
-              Custom problem
+            <label className="custom-problem-field">
+              Problem statement
               <textarea
+                ref={customProblemRef}
                 value={customTopic}
                 onChange={(event) => setCustomTopic(event.target.value)}
                 placeholder="Example: Internal support assistant that answers questions from private runbooks and escalates risky actions."
-                rows={3}
+                rows={4}
               />
             </label>
           )}
