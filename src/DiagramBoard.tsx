@@ -274,7 +274,7 @@ function labelPosition(shape: DiagramShape, shapes: DiagramShape[]): Point {
   }
 
   if (shape.primitive === "queue") {
-    return { x: label.x, y: shape.y + shape.height - 5 };
+    return { x: label.x, y: shape.y + shape.height - 12 };
   }
 
   if (shape.primitive === "model") {
@@ -941,7 +941,7 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
                     strokeWidth={strokeWidth}
                   />
                   <ellipse cx={leftCx} cy={cy} rx={endWidth / 2} ry={tubeHeight / 2} fill="#eef4ff" stroke={componentColor} strokeWidth={strokeWidth} />
-                  {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 5} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
+                  {showLabel && shape.label && <text x={label.x} y={shape.y + shape.height - 12} textAnchor="middle" fill="#1f2937" fontSize={shapeLabelSize} fontWeight={shapeLabelWeight}><title>{shape.label}</title>{labelText}</text>}
                 </g>
               );
             }
