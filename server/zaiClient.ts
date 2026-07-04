@@ -3,6 +3,11 @@ export interface ChatMessage {
   content: string;
 }
 
+interface CallOptions {
+  maxTokens?: number;
+  temperature?: number;
+}
+
 interface AnthropicTextBlock {
   type?: string;
   text?: string;
@@ -47,7 +52,7 @@ function providerErrorMessage(body: AnthropicResponse | null, response: Response
   return `Z.AI request failed (HTTP ${response.status}${statusText}${codeText})${messageText}`;
 }
 
-function toAnthropicPayload(messages: ChatMessage[], model: string) {
+function toAnthropicPayload(messages: ChatMessage[], model: string, options: CallOptions = {}) {
   const system = messages
     .filter((message) => message.role === "system")
     .map((message) => message.content.trim())
@@ -87,8 +92,8 @@ function toAnthropicPayload(messages: ChatMessage[], model: string) {
 
   return {
     model,
-    max_tokens: 2048,
-    temperature: 0.35,
+    max_tokens: options.maxTokens ?? 2048,
+    temperature: options.temperature ?? 0.35,
     ...(system ? { system } : {}),
     messages: conversation
   };
@@ -111,7 +116,7 @@ function parseTextContent(body: AnthropicResponse | null) {
     .trim();
 }
 
-export async function callZai(messages: ChatMessage[]) {
+export async function callZai(messages: ChatMessage[], options: CallOptions = {}) {
   const apiKey = process.env.ZAI_API_KEY;
   if (!apiKey) {
     throw new Error("ZAI_API_KEY is not configured");
@@ -119,7 +124,7 @@ export async function callZai(messages: ChatMessage[]) {
 
   const baseUrl = process.env.ZAI_BASE_URL?.trim() || DEFAULT_BASE_URL;
   const model = process.env.ZAI_MODEL?.trim() || DEFAULT_MODEL;
-  const payload = toAnthropicPayload(messages, model);
+  const payload = toAnthropicPayload(messages, model, options);
 
   let response: Response;
   try {

@@ -9,6 +9,14 @@ export interface SessionConfig {
   persona: Persona;
   feedbackMode: FeedbackMode;
   constraints: string[];
+  brief?: InterviewBrief;
+}
+
+export interface InterviewBrief {
+  problem: string;
+  context: string;
+  constraints: string[];
+  examples: string[];
 }
 
 export interface ChatMessage {

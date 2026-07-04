@@ -27,6 +27,19 @@ interface TurnRequest {
   canvasSummary?: unknown;
 }
 
+interface BriefRequest {
+  topic: string;
+  level: SessionConfig["level"];
+  seedConstraints?: string[];
+}
+
+interface InterviewBrief {
+  problem: string;
+  context: string;
+  constraints: string[];
+  examples: string[];
+}
+
 function validateTurnRequest(body: unknown): TurnRequest {
   const request = body as Partial<TurnRequest>;
   if (!request.session || !Array.isArray(request.messages)) {
@@ -39,6 +52,76 @@ function validateTurnRequest(body: unknown): TurnRequest {
   };
 }
 
+function validateBriefRequest(body: unknown): BriefRequest {
+  const request = body as Partial<BriefRequest>;
+  if (!request.topic || !request.level) {
+    throw new Error("Request must include topic and level");
+  }
+  return {
+    topic: request.topic,
+    level: request.level,
+    seedConstraints: Array.isArray(request.seedConstraints)
+      ? request.seedConstraints.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+      : []
+  };
+}
+
+function firstJsonObject(value: string) {
+  const start = value.indexOf("{");
+  const end = value.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return undefined;
+  return value.slice(start, end + 1);
+}
+
+function readStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function defaultBrief(topic: string, seedConstraints: string[]): InterviewBrief {
+  return {
+    problem: topic,
+    context: "Treat this as a production AI system with real users, cost, safety, reliability, and observability concerns.",
+    constraints: seedConstraints.length ? seedConstraints.slice(0, 4) : [
+      "The design should cover quality, latency, cost, safety, and monitoring.",
+      "Ambiguous or high-risk outputs need a clear fallback or review path."
+    ],
+    examples: [
+      "A normal successful request.",
+      "An ambiguous or low-confidence request.",
+      "A provider, retrieval, or tool failure."
+    ]
+  };
+}
+
+function normalizeBrief(rawText: string, topic: string, seedConstraints: string[]): InterviewBrief {
+  const fallback = defaultBrief(topic, seedConstraints);
+  try {
+    const json = firstJsonObject(rawText);
+    const parsed = json ? JSON.parse(json) as Partial<InterviewBrief> : undefined;
+    if (parsed) {
+      const constraints = readStringArray(parsed.constraints);
+      const examples = readStringArray(parsed.examples);
+      return {
+        problem: typeof parsed.problem === "string" && parsed.problem.trim() ? parsed.problem.trim() : topic,
+        context: typeof parsed.context === "string" && parsed.context.trim()
+          ? parsed.context.trim()
+          : fallback.context,
+        constraints: constraints.length ? constraints : fallback.constraints,
+        examples: examples.length ? examples : fallback.examples
+      };
+    }
+  } catch {
+    // Fall through to a deterministic fallback.
+  }
+
+  return fallback;
+}
+
 app.get("/api/health", (_req, res) => {
   const zaiConfigured = Boolean(process.env.ZAI_API_KEY);
   res.json({
@@ -47,6 +130,47 @@ app.get("/api/health", (_req, res) => {
     zaiConfigured,
     ready: zaiConfigured
   });
+});
+
+app.post("/api/interview/brief", async (req, res) => {
+  try {
+    if (!process.env.ZAI_API_KEY) {
+      throw new Error("ZAI_API_KEY is not configured");
+    }
+    const request = validateBriefRequest(req.body);
+    const seedText = request.seedConstraints?.length
+      ? request.seedConstraints.map((constraint) => `- ${constraint}`).join("\n")
+      : "- No seed constraints.";
+    const rawBrief = await callZai([
+      {
+        role: "system",
+        content: "Create compact AI system design interview briefs as structured output. Return one valid JSON object only. Do not include markdown."
+      },
+      {
+        role: "user",
+        content: `Create one varied interview brief for this topic: ${request.topic}
+Candidate level: ${request.level}
+
+Seed constraints:
+${seedText}
+
+Return exactly this JSON schema:
+{
+  "problem": "one sentence, specific but not solution-revealing",
+  "context": "one short paragraph with product or domain detail",
+  "constraints": ["2-4 concrete constraints"],
+  "examples": ["2-3 representative user inputs, documents, requests, or edge cases"]
+}
+
+Keep the total under 140 words. Do not solve the architecture.`
+      }
+    ], { maxTokens: 380, temperature: 0.7 });
+
+    res.json({ brief: normalizeBrief(rawBrief, request.topic, request.seedConstraints ?? []) });
+  } catch (error) {
+    const response = errorResponse(error, "Unknown interview brief error");
+    res.status(response.status).json({ error: response.error });
+  }
 });
 
 function errorResponse(error: unknown, fallback: string) {

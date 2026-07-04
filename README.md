@@ -6,7 +6,8 @@ The app uses the unpacked prompt pack in `ai_engineering_interviewer_prompts/` a
 
 ## Features
 
-- AI engineering interview setup by level, duration, persona, feedback mode, topic, and constraints
+- AI engineering interview setup by level, duration, persona, and topic
+- Lightweight AI-generated scenario briefs with constraints and examples before the full interview prompt takes over
 - Focused system design canvas with components, notes, attached connectors, undo, redo, clear, and delete controls
 - Transcript-based interviewer turns
 - End-of-session structured feedback against the AI engineering rubric

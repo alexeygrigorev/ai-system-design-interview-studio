@@ -12,6 +12,14 @@ export interface SessionConfig {
   persona: Persona;
   feedbackMode: FeedbackMode;
   constraints: string[];
+  brief?: InterviewBrief;
+}
+
+interface InterviewBrief {
+  problem: string;
+  context: string;
+  constraints: string[];
+  examples: string[];
 }
 
 const personaFiles: Record<Persona, string> = {
@@ -39,6 +47,16 @@ export async function buildSystemPrompt(projectRoot: string, session: SessionCon
   const constraints = session.constraints.length
     ? session.constraints.map((constraint) => `- ${constraint}`).join("\n")
     : "- No extra constraints.";
+  const brief = session.brief
+    ? `Expanded interview brief:
+
+Problem: ${session.brief.problem}
+Context: ${session.brief.context}
+Constraints:
+${session.brief.constraints.length ? session.brief.constraints.map((constraint) => `- ${constraint}`).join("\n") : "- No generated constraints."}
+Examples:
+${session.brief.examples.length ? session.brief.examples.map((example) => `- ${example}`).join("\n") : "- No generated examples."}`
+    : "Expanded interview brief: not generated.";
 
   const sessionPrompt = `Session configuration:
 
@@ -46,6 +64,7 @@ Candidate level: ${session.level}
 Interview duration: ${session.duration} minutes
 Interview topic: ${session.topic}
 Feedback mode: ${session.feedbackMode}
+${brief}
 Constraints:
 ${constraints}`;
 

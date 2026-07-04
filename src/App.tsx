@@ -1,9 +1,9 @@
 import { Bot, Loader2, MoreVertical, Play, RotateCcw, Send, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getHealth, requestInterviewTurn, type HealthStatus } from "./api";
+import { getHealth, requestInterviewBrief, requestInterviewTurn, type HealthStatus } from "./api";
 import { DiagramBoard } from "./DiagramBoard";
 import { interviewProblems } from "./questionBank";
-import type { CandidateLevel, ChatMessage, DiagramShape, Persona, PrimitiveKind, SessionConfig } from "./types";
+import type { CandidateLevel, ChatMessage, DiagramShape, InterviewBrief, Persona, PrimitiveKind, SessionConfig } from "./types";
 
 const SESSION_STORAGE_KEY = "ai-system-design-trainer.session.v1";
 
@@ -13,7 +13,6 @@ interface PersistedState {
   persona: Persona | "random";
   topic: string;
   customTopic: string;
-  constraintText: string;
   messages: ChatMessage[];
   answer: string;
   shapes: DiagramShape[];
@@ -21,6 +20,7 @@ interface PersistedState {
   activePersona: Persona;
   activeTopic: string;
   activeConstraints: string[];
+  activeBrief?: InterviewBrief;
   remainingSeconds: number;
 }
 
@@ -42,8 +42,18 @@ function summarizeConnector(shape: DiagramShape, shapesById: Map<string, Diagram
   return "Unconnected connector";
 }
 
-function openingTurn(topic: string) {
-  return `Problem: ${topic}
+function openingTurn(brief: InterviewBrief) {
+  const constraints = brief.constraints.map((constraint) => `- ${constraint}`).join("\n");
+  const examples = brief.examples.map((example) => `- ${example}`).join("\n");
+  return `Problem: ${brief.problem}
+
+${brief.context}
+
+Constraints:
+${constraints}
+
+Examples:
+${examples}
 
 Before drawing the architecture, what would you clarify about users, success criteria, data sources, scale, latency, safety, and constraints?`;
 }
@@ -55,23 +65,13 @@ function formatTimer(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function formatConstraints(constraints: string[]) {
-  return constraints.join("\n");
-}
-
-function parseConstraints(value: string) {
-  return value
-    .split("\n")
-    .map((line) => line.replace(/^-+\s*/, "").trim())
-    .filter(Boolean);
-}
-
 function loadPersistedState(): Partial<PersistedState> {
   try {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (!parsed || typeof parsed !== "object" || parsed.screen !== "interview") return {};
+    return parsed;
   } catch {
     return {};
   }
@@ -130,8 +130,8 @@ function App() {
   const [persona, setPersona] = useState<Persona | "random">(persistedState.persona ?? "random");
   const [topic, setTopic] = useState(persistedState.topic ?? "__random__");
   const [customTopic, setCustomTopic] = useState(persistedState.customTopic ?? "");
-  const [constraintText, setConstraintText] = useState(persistedState.constraintText ?? formatConstraints(interviewProblems[0].constraints));
   const [activeConstraints, setActiveConstraints] = useState<string[]>(persistedState.activeConstraints ?? []);
+  const [activeBrief, setActiveBrief] = useState<InterviewBrief | undefined>(persistedState.activeBrief);
   const [messages, setMessages] = useState<ChatMessage[]>(persistedState.messages ?? []);
   const [answer, setAnswer] = useState(persistedState.answer ?? "");
   const [shapes, setShapes] = useState<DiagramShape[]>(persistedState.shapes ?? []);
@@ -149,8 +149,9 @@ function App() {
     persona: activePersona,
     feedbackMode: "end_only",
     topic: activeTopic,
-    constraints: activeConstraints
-  }), [activeConstraints, activePersona, activeTopic, duration, level]);
+    constraints: activeConstraints,
+    brief: activeBrief
+  }), [activeBrief, activeConstraints, activePersona, activeTopic, duration, level]);
 
   const providerReady = Boolean(health?.ok && health.ready);
   function missingProviderMessage() {
@@ -194,7 +195,6 @@ function App() {
       persona,
       topic,
       customTopic,
-      constraintText,
       messages,
       answer,
       shapes,
@@ -202,15 +202,16 @@ function App() {
       activePersona,
       activeTopic,
       activeConstraints,
+      activeBrief,
       remainingSeconds
     };
     window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextState));
   }, [
     activeConstraints,
+    activeBrief,
     activePersona,
     activeTopic,
     answer,
-    constraintText,
     customTopic,
     duration,
     level,
@@ -232,14 +233,6 @@ function App() {
 
   function updateTopic(nextTopic: string) {
     setTopic(nextTopic);
-    if (nextTopic === "__custom__") {
-      setConstraintText("");
-      return;
-    }
-    const selectedProblem = interviewProblems.find((problem) => problem.title === nextTopic);
-    if (selectedProblem) {
-      setConstraintText(formatConstraints(selectedProblem.constraints));
-    }
   }
 
   async function startInterview() {
@@ -247,9 +240,7 @@ function App() {
     const selectedProblem = interviewProblems.find((problem) => problem.title === topic);
     const resolvedProblem = topic === "__random__" ? randomProblem : selectedProblem;
     const resolvedTopic = topic === "__custom__" ? customTopic.trim() : resolvedProblem?.title ?? topic;
-    const resolvedConstraints = topic === "__random__"
-      ? randomProblem.constraints
-      : parseConstraints(constraintText);
+    const seedConstraints = resolvedProblem?.constraints ?? [];
     const personas: Persona[] = ["supportive", "neutral", "adversarial"];
     const resolvedPersona = persona === "random"
       ? personas[Math.floor(Math.random() * personas.length)]
@@ -257,11 +248,12 @@ function App() {
 
     setActiveTopic(resolvedTopic);
     setActivePersona(resolvedPersona);
-    setActiveConstraints(resolvedConstraints);
     setBusy(true);
     setError("");
     setMessages([]);
     setShapes([]);
+    setActiveBrief(undefined);
+    setActiveConstraints([]);
     setRemainingSeconds(duration * 60);
     if (!resolvedTopic) {
       setError("Enter a custom problem or choose one from the list.");
@@ -274,9 +266,18 @@ function App() {
       setBusy(false);
       return;
     }
-    setMessages([{ role: "assistant", content: openingTurn(resolvedTopic) }]);
-    setScreen("interview");
-    setBusy(false);
+    try {
+      const { brief } = await requestInterviewBrief(resolvedTopic, level, seedConstraints);
+      setActiveTopic(brief.problem);
+      setActiveBrief(brief);
+      setActiveConstraints(brief.constraints);
+      setMessages([{ role: "assistant", content: openingTurn(brief) }]);
+      setScreen("interview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not prepare interview brief");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function sendAnswer() {
@@ -309,6 +310,9 @@ function App() {
     setError("");
     setShapes([]);
     setActiveConstraints([]);
+    setActiveBrief(undefined);
+    setTopic("__random__");
+    setCustomTopic("");
     setRemainingSeconds(duration * 60);
     setScreen("setup");
   }
@@ -377,16 +381,6 @@ function App() {
               />
             </label>
           )}
-
-          <label>
-            Problem-specific constraints
-            <textarea
-              value={constraintText}
-              onChange={(event) => setConstraintText(event.target.value)}
-              placeholder="Optional. Example: regulated domain, low latency, human approval for irreversible actions."
-              rows={4}
-            />
-          </label>
 
           <button className="primary-button setup-start" onClick={startInterview} disabled={busy || !providerReady} type="button">
             {busy ? <Loader2 className="spin" size={17} /> : <Play size={17} />}

@@ -1,4 +1,4 @@
-import type { ChatMessage, DiagramShape, SessionConfig } from "./types";
+import type { CandidateLevel, ChatMessage, DiagramShape, InterviewBrief, SessionConfig } from "./types";
 
 export interface HealthStatus {
   ok: boolean;
@@ -39,6 +39,18 @@ export function requestInterviewTurn(
     session,
     messages,
     canvasSummary
+  });
+}
+
+export function requestInterviewBrief(
+  topic: string,
+  level: CandidateLevel,
+  seedConstraints: string[]
+) {
+  return postJson<{ brief: InterviewBrief }>("/api/interview/brief", {
+    topic,
+    level,
+    seedConstraints
   });
 }
 
