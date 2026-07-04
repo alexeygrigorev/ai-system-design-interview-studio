@@ -9,9 +9,16 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
+  overflow: hidden;
 }
 
 button,
@@ -86,7 +93,9 @@ button:disabled {
 .setup-screen {
   align-items: center;
   display: flex;
+  height: 100%;
   min-height: 100vh;
+  overflow: auto;
   padding: 24px;
 }
 
@@ -166,11 +175,14 @@ button:disabled {
 .interview-shell {
   display: grid;
   grid-template-columns: minmax(520px, 1fr) 410px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .workspace {
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
 .interview-panel {
@@ -179,7 +191,9 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -188,7 +202,7 @@ button:disabled {
   border: 0;
   display: grid;
   grid-template-rows: auto auto minmax(420px, 1fr);
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   position: relative;
 }
@@ -282,6 +296,7 @@ button:disabled {
 }
 
 .compact-heading {
+  flex-shrink: 0;
   min-height: 34px;
 }
 
@@ -442,7 +457,7 @@ button:disabled {
   flex: 1;
   flex-direction: column;
   gap: 12px;
-  min-height: 260px;
+  min-height: 0;
   overflow: auto;
   padding-right: 2px;
 }
@@ -525,6 +540,7 @@ button:disabled {
 .answer-box {
   border-top: 1px solid #e1e7f0;
   display: grid;
+  flex-shrink: 0;
   gap: 10px;
   padding-top: 14px;
 }
@@ -541,13 +557,14 @@ button:disabled {
 
 @media (max-width: 1120px) {
   .interview-shell {
-    display: block;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 58vh) minmax(0, 42vh);
   }
 
   .interview-panel {
     border-left: 0;
     border-top: 1px solid #d9e0eb;
-    min-height: 560px;
+    height: 100%;
   }
 }
 

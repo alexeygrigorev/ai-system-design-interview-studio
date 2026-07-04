@@ -58,6 +58,27 @@ ${examples}
 Before drawing the architecture, what would you clarify about users, success criteria, data sources, scale, latency, safety, and constraints?`;
 }
 
+function openingPlaceholder(topic: string) {
+  return `Problem: ${topic}
+
+Generating scenario details, constraints, and examples...`;
+}
+
+function replaceLastAssistantMessage(messages: ChatMessage[], content: string): ChatMessage[] {
+  const nextMessages: ChatMessage[] = [...messages];
+  for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+    if (nextMessages[index].role === "assistant") {
+      nextMessages[index] = { role: "assistant", content };
+      return nextMessages;
+    }
+  }
+  return [...messages, { role: "assistant", content }];
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function formatTimer(seconds: number) {
   const safeSeconds = Math.max(0, seconds);
   const minutes = Math.floor(safeSeconds / 60);
@@ -70,7 +91,7 @@ function loadPersistedState(): Partial<PersistedState> {
     const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    if (!parsed || typeof parsed !== "object" || parsed.screen !== "interview") return {};
+    if (!parsed || typeof parsed !== "object" || parsed.screen !== "interview" || !parsed.activeBrief) return {};
     return parsed;
   } catch {
     return {};
@@ -246,33 +267,39 @@ function App() {
       ? personas[Math.floor(Math.random() * personas.length)]
       : persona;
 
-    setActiveTopic(resolvedTopic);
-    setActivePersona(resolvedPersona);
-    setBusy(true);
-    setError("");
-    setMessages([]);
-    setShapes([]);
-    setActiveBrief(undefined);
-    setActiveConstraints([]);
-    setRemainingSeconds(duration * 60);
     if (!resolvedTopic) {
       setError("Enter a custom problem or choose one from the list.");
-      setBusy(false);
       return;
     }
     const providerError = missingProviderMessage();
     if (providerError) {
       setError(providerError);
-      setBusy(false);
       return;
     }
+
+    setActiveTopic(resolvedTopic);
+    setActivePersona(resolvedPersona);
+    setActiveBrief(undefined);
+    setActiveConstraints([]);
+    setBusy(true);
+    setError("");
+    setMessages([{ role: "assistant", content: openingPlaceholder(resolvedTopic) }]);
+    setShapes([]);
+    setRemainingSeconds(duration * 60);
+    setScreen("interview");
+
     try {
       const { brief } = await requestInterviewBrief(resolvedTopic, level, seedConstraints);
+      const opening = openingTurn(brief);
       setActiveTopic(brief.problem);
       setActiveBrief(brief);
       setActiveConstraints(brief.constraints);
-      setMessages([{ role: "assistant", content: openingTurn(brief) }]);
-      setScreen("interview");
+      const chunkSize = Math.max(24, Math.ceil(opening.length / 24));
+      for (let length = chunkSize; length < opening.length; length += chunkSize) {
+        setMessages((currentMessages) => replaceLastAssistantMessage(currentMessages, opening.slice(0, length)));
+        await wait(18);
+      }
+      setMessages((currentMessages) => replaceLastAssistantMessage(currentMessages, opening));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not prepare interview brief");
     } finally {
@@ -282,7 +309,7 @@ function App() {
 
   async function sendAnswer() {
     const trimmed = answer.trim();
-    if (!trimmed || busy || messages.length === 0) return;
+    if (!trimmed || busy || messages.length === 0 || !activeBrief) return;
     const providerError = missingProviderMessage();
     if (providerError) {
       setError(providerError);
@@ -449,7 +476,7 @@ function App() {
               }
             }}
           />
-          <button className="primary-button" onClick={sendAnswer} disabled={busy || messages.length === 0 || !answer.trim()} type="button">
+          <button className="primary-button" onClick={sendAnswer} disabled={busy || messages.length === 0 || !activeBrief || !answer.trim()} type="button">
             <Send size={17} />
             Send
           </button>
