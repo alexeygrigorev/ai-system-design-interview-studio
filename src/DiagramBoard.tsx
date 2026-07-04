@@ -486,7 +486,6 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
     if (!source) return;
     const sourceHandle = connectionHandleById(source, sourceHandleId) ?? nearestConnectionHandle(source, centerOf(target));
     const targetHandle = nearestConnectionHandle(target, targetPoint);
-    const label = window.prompt("Add a note for this arrow?")?.trim();
     const next: DiagramShape = {
       id: crypto.randomUUID(),
       type: "arrow",
@@ -499,10 +498,13 @@ export function DiagramBoard({ shapes, setShapes, sessionControls }: DiagramBoar
       targetId: target.id,
       sourceHandleId: sourceHandle.id,
       targetHandleId: targetHandle.id,
-      label: label || undefined
+      label: "Connection"
     };
     commitShapes((currentShapes) => [...currentShapes, next]);
-    setSelectedId(source.id);
+    setSelectedId(next.id);
+    skipNextEditCommitRef.current = false;
+    setEditingId(next.id);
+    setEditingLabel("Connection");
     setConnectorDrag(null);
     setTool("select");
   }
