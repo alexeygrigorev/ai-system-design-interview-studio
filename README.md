@@ -43,6 +43,24 @@ npm run build
 NODE_ENV=production node dist-server/index.js
 ```
 
+## Deploy
+
+The app runs on AWS Lambda behind an HTTP API Gateway at
+**https://sds.dtcdev.click**, provisioned declaratively with CloudFormation
+(mirrors the ai-engineering-gym setup). A passphrase gate (`STUDIO_PASSPHRASE`,
+default `aislgym`) protects the app; the server also needs `ZAI_API_KEY` and a
+stable `SESSION_SECRET` (for signed session cookies).
+
+```bash
+ZAI_API_KEY=… SESSION_SECRET=… bash scripts/deploy.sh
+```
+
+CI/CD: pushes to `main` run `.github/workflows/deploy.yml` — typecheck + build,
+then an OIDC-assumed deploy role (`ai-systmem-design-studio-deploy`) runs
+`scripts/deploy.sh`. The GitHub Actions secrets `ZAI_API_KEY` and
+`STUDIO_SESSION_SECRET` must be set. The OIDC role is created once with
+`scripts/bootstrap-iam.sh`.
+
 ## Sources
 
 - Prompt pack: `ai_engineering_interviewer_prompts/`

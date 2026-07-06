@@ -1,0 +1,171 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AI System Design Studio — Express app on Lambda behind an HTTP API, fronted by a
+  custom domain (sds.dtcdev.click) with an ACM cert (DNS-validated in Route53) and
+  a Route53 alias. Fully declarative CloudFormation. Stateless (no database).
+
+Parameters:
+  CodeBucket:
+    Type: String
+    Description: S3 bucket holding the built Lambda zip
+  CodeKey:
+    Type: String
+    Description: S3 key of the Lambda zip
+  DomainName:
+    Type: String
+    Default: sds.dtcdev.click
+  HostedZoneId:
+    Type: String
+    Default: Z05963572WVWFHDQZH5NE
+    Description: Route53 hosted zone id for dtcdev.click (authoritative zone)
+  ZaiApiKey:
+    Type: String
+    NoEcho: true
+    Description: Z.AI (Anthropic-compatible) API key
+  ZaiModel:
+    Type: String
+    Default: glm-5.2
+  ZaiBaseUrl:
+    Type: String
+    Default: https://api.z.ai/api/anthropic
+  Passphrase:
+    Type: String
+    Default: aislgym
+    NoEcho: true
+    Description: Shared passphrase gate (same default as the AISL Gym)
+  SessionSecret:
+    Type: String
+    NoEcho: true
+    Description: Secret used to sign session cookies (keep stable across deploys)
+
+Resources:
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  StudioFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ai-systmem-design-studio
+      Runtime: nodejs22.x
+      Architectures: [x86_64]
+      Handler: handler.handler
+      MemorySize: 1024
+      Timeout: 60
+      Role: !GetAtt LambdaRole.Arn
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+      Environment:
+        Variables:
+          NODE_ENV: production
+          ZAI_API_KEY: !Ref ZaiApiKey
+          ZAI_MODEL: !Ref ZaiModel
+          ZAI_BASE_URL: !Ref ZaiBaseUrl
+          STUDIO_PASSPHRASE: !Ref Passphrase
+          SESSION_SECRET: !Ref SessionSecret
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: ai-systmem-design-studio
+      ProtocolType: HTTP
+
+  Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt StudioFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: $default
+      Target: !Sub "integrations/${Integration}"
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudioFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
+
+  # Keep-warm: ping every 5 minutes so containers stay hot (no cold-start latency).
+  WarmRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StudioFunction.Arn
+          Id: warm
+          Input: '{"warmup": true}'
+
+  WarmPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StudioFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WarmRule.Arn
+
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  ApiDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameConfigurations:
+        - CertificateArn: !Ref Certificate
+          EndpointType: REGIONAL
+
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      ApiId: !Ref HttpApi
+      DomainName: !Ref ApiDomain
+      Stage: !Ref DefaultStage
+
+  AliasRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  CustomDomain:
+    Value: !Sub "https://${DomainName}"
+  FunctionName:
+    Value: !Ref StudioFunction

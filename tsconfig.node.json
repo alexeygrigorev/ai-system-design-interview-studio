@@ -12,5 +12,5 @@
     "outDir": "dist-server",
     "types": ["node"]
   },
-  "include": ["server/**/*.ts", "vite.config.ts"]
+  "include": ["server/**/*.ts", "lambda/**/*.ts", "vite.config.ts"]
 }
