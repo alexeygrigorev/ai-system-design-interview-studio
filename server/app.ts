@@ -254,7 +254,7 @@ function errorResponse(error: unknown, fallback: string) {
 }
 
 /** Build the Express app. Imported by the dev server (server/index.ts) and the
- *  Lambda handler (lambda/handler.ts). Never starts listening or imports vite.
+ *  Lambda HTTP server (lambda/server.ts), run behind the Lambda Web Adapter.
  *  `projectRoot` is where the `dist/` frontend and `ai_engineering_interviewer_prompts/`
  *  live — the repo root in dev, /var/task (LAMBDA_TASK_ROOT) on Lambda. */
 export function createApp(projectRoot: string) {

@@ -298,6 +298,7 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(520px, 1fr) 410px;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -354,7 +355,9 @@ button:disabled {
   color: var(--text);
   font-size: 13px;
   line-height: 1.35;
+  max-height: min(320px, 60vh);
   max-width: 260px;
+  overflow: auto;
   padding: 10px 12px;
 }
 
@@ -1026,7 +1029,7 @@ button:disabled {
 
 @media (max-width: 760px) {
   .setup-screen {
-    padding: 12px;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   }
 
   .setup-workspace {
@@ -1037,9 +1040,88 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  /* Phone split: canvas on top, chat gets the larger share. */
+  .interview-shell {
+    grid-template-rows: minmax(0, 46vh) minmax(0, 1fr);
+  }
+
+  .interview-panel {
+    padding: 10px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  /* Toolbar -> two rows: scrollable component strip on top, pointer +
+     session controls on the bottom row. Avoids vertical blow-up. */
   .board-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .tool-strip {
+    order: 2;
+  }
+
+  .component-toolbar {
+    flex: 0 0 100%;
+    min-width: 0;
+    order: 1;
+    overflow-x: auto;
+    padding-left: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .component-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .canvas-session-controls {
+    order: 3;
+    padding-left: 0;
+  }
+
+  /* Touch targets >=40px. */
+  .icon-button,
+  .component-chip,
+  .session-menu summary {
+    height: 40px;
+    min-width: 40px;
+    width: 40px;
+  }
+
+  .component-toolbar .component-chip {
+    flex-shrink: 0;
+  }
+
+  .corner-tool {
+    min-height: 40px;
+  }
+
+  .zoom-button {
+    height: 40px;
+  }
+
+  .canvas-zoom-controls .icon-button {
+    height: 36px;
+    width: 36px;
+  }
+
+  .canvas-zoom-controls .zoom-button {
+    height: 36px;
+  }
+
+  .answer-box textarea {
+    height: 72px;
+  }
+
+  .message {
+    padding: 10px;
+  }
+
+  .hint-item label {
+    min-height: 40px;
   }
 
   .hint-explanation {

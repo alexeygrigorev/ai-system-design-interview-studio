@@ -34,9 +34,14 @@ npm run build:lambda
 
 echo "==> assembling package"
 rm -rf build/pkg && mkdir -p build/pkg
-cp build/lambda/handler.cjs build/pkg/handler.cjs
+cp build/lambda/server.cjs build/pkg/server.cjs
 cp -r dist build/pkg/dist
 cp -r ai_engineering_interviewer_prompts build/pkg/ai_engineering_interviewer_prompts
+# Lambda Web Adapter bootstrap: the function Handler (run.sh) execs the bundled
+# HTTP server; LWA proxies Function URL (RESPONSE_STREAM) invocations to it on
+# AWS_LWA_PORT, which is what lets /api/interview/turn/stream flush per-token.
+printf '#!/bin/sh\nexec node /var/task/server.cjs\n' > build/pkg/run.sh
+chmod +x build/pkg/run.sh
 
 echo "==> zipping"
 rm -f build/lambda.zip
