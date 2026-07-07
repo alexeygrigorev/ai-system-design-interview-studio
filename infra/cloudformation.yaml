@@ -99,9 +99,7 @@ Resources:
       FunctionName: !Ref StudioFunction
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
-      Condition:
-        StringEquals:
-          lambda:FunctionUrlAuthType: NONE
+      FunctionUrlAuthType: NONE
 
   RedirectRole:
     Type: AWS::IAM::Role
@@ -128,7 +126,7 @@ Resources:
       Timeout: 3
       Environment:
         Variables:
-          REDIRECT_TARGET: !GetAtt FunctionUrl.FunctionUrlUrl
+          REDIRECT_TARGET: !GetAtt FunctionUrl.FunctionUrl
       Code:
         ZipFile: |
           exports.handler = async (event) => {
@@ -236,7 +234,7 @@ Resources:
 
 Outputs:
   FunctionUrl:
-    Value: !GetAtt FunctionUrl.FunctionUrlUrl
+    Value: !GetAtt FunctionUrl.FunctionUrl
   CustomDomain:
     Value: !Sub "https://${DomainName}"
   FunctionName:
