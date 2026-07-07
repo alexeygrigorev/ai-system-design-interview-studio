@@ -1,10 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  AI System Design Studio — Express app on Lambda served via a streaming Function
-  URL (RESPONSE_STREAM + Lambda Web Adapter) for true token streaming. The custom
-  domain (sds.dtcdev.click) stays on the API Gateway HTTP API + regional ACM cert
-  and 301-redirects to the Function URL. Fully declarative CloudFormation.
-  Stateless (no database).
+  AI System Design Studio — Express app on Lambda served via API Gateway HTTP API
+  with a custom domain (sds.dtcdev.click), an ACM cert (DNS-validated in Route53)
+  and a Route53 alias. The Express app runs behind the Lambda Web Adapter (LWA) in
+  buffered mode. Fully declarative CloudFormation. Stateless (no database).
+
+  NOTE on streaming: the original plan was a streaming Function URL
+  (RESPONSE_STREAM + LWA) so /api/interview/turn/stream could flush tokens. That
+  is NOT possible in this account: an SCP blocks public lambda:InvokeFunctionUrl
+  (every public Function URL, even a minimal throwaway, returns 403 Forbidden).
+  API Gateway buffers Lambda responses, so the stream endpoint works but returns
+  the whole reply at once (buffered) rather than token-by-token. See git history
+  for the Function URL stack if streaming is ever needed in an account that allows
+  public Function URLs.
 
 Parameters:
   CodeBucket:
@@ -61,7 +69,7 @@ Resources:
       Architectures: [x86_64]
       Handler: run.sh
       MemorySize: 1024
-      Timeout: 180
+      Timeout: 60
       Role: !GetAtt LambdaRole.Arn
       Code:
         S3Bucket: !Ref CodeBucket
@@ -77,71 +85,12 @@ Resources:
           STUDIO_PASSPHRASE: !Ref Passphrase
           SESSION_SECRET: !Ref SessionSecret
           # Lambda Web Adapter: run the Express app as a long-lived HTTP server
-          # and stream Function URL responses (see lambda/server.ts + run.sh).
+          # and serve it behind the API Gateway (buffered). A streaming Function
+          # URL is not used — the account's SCP blocks public lambda:InvokeFunctionUrl.
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
-          AWS_LWA_INVOKE_MODE: response_stream
+          AWS_LWA_INVOKE_MODE: buffered
           AWS_LWA_PORT: "8080"
           AWS_LWA_READINESS_CHECK_PATH: "/"
-
-  # Public streaming endpoint. RESPONSE_STREAM + the Web Adapter above is what
-  # defeats the API Gateway 30s buffer. AuthType NONE — the app's passphrase gate
-  # remains the access control (same model as the AISL Gym).
-  FunctionUrl:
-    Type: AWS::Lambda::Url
-    Properties:
-      TargetFunctionArn: !GetAtt StudioFunction.Arn
-      AuthType: NONE
-      InvokeMode: RESPONSE_STREAM
-
-  FunctionUrlPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref StudioFunction
-      Action: lambda:InvokeFunctionUrl
-      Principal: "*"
-      FunctionUrlAuthType: NONE
-
-  RedirectRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: { Service: lambda.amazonaws.com }
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-  # sds.dtcdev.click (still on the API Gateway custom domain + regional ACM cert)
-  # now 301-redirects to the Function URL, preserving path/query. Keeps the
-  # branded link alive without CloudFront or a us-east-1 cert.
-  RedirectLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: index.handler
-      Role: !GetAtt RedirectRole.Arn
-      Runtime: nodejs22.x
-      MemorySize: 128
-      Timeout: 3
-      Environment:
-        Variables:
-          REDIRECT_TARGET: !GetAtt FunctionUrl.FunctionUrl
-      Code:
-        ZipFile: |
-          exports.handler = async (event) => {
-            const base = (process.env.REDIRECT_TARGET || "").replace(/\/$/, "");
-            const path = event.rawPath || "/";
-            const query = event.rawQueryString ? "?" + event.rawQueryString : "";
-            return {
-              statusCode: 301,
-              headers: {
-                Location: base + path + query,
-                "Cache-Control": "no-store"
-              },
-              body: ""
-            };
-          };
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
@@ -154,7 +103,7 @@ Resources:
     Properties:
       ApiId: !Ref HttpApi
       IntegrationType: AWS_PROXY
-      IntegrationUri: !GetAtt RedirectLambda.Arn
+      IntegrationUri: !GetAtt StudioFunction.Arn
       PayloadFormatVersion: '2.0'
 
   DefaultRoute:
@@ -174,7 +123,7 @@ Resources:
   InvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref RedirectLambda
+      FunctionName: !Ref StudioFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
@@ -233,8 +182,8 @@ Resources:
         HostedZoneId: !GetAtt ApiDomain.RegionalHostedZoneId
 
 Outputs:
-  FunctionUrl:
-    Value: !GetAtt FunctionUrl.FunctionUrl
+  ApiEndpoint:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
   CustomDomain:
     Value: !Sub "https://${DomainName}"
   FunctionName:
