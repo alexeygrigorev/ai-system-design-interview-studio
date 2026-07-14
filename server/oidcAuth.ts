@@ -56,7 +56,7 @@ export async function finishOidcLogin(req: Request, res: Response) {
   const code = typeof req.query.code === "string" ? req.query.code : "";
   const state = typeof req.query.state === "string" ? req.query.state : "";
   if (!pending || !code || !state || !equal(state, pending.state)) {
-    return res.status(400).send("Invalid or expired login state");
+    return res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).redirect(303, "/auth/error");
   }
   const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
     method: "POST",
@@ -64,17 +64,17 @@ export async function finishOidcLogin(req: Request, res: Response) {
     body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId,
       code, redirect_uri: callbackUrl, code_verifier: pending.verifier })
   });
-  if (!tokenResponse.ok) return res.status(401).send("Login code exchange failed");
+  if (!tokenResponse.ok) return res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).redirect(303, "/auth/error");
   const tokens = (await tokenResponse.json()) as { id_token?: string };
-  if (!tokens.id_token) return res.status(401).send("Identity token missing");
+  if (!tokens.id_token) return res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).redirect(303, "/auth/error");
   const verified = await jwtVerify(tokens.id_token, createRemoteJWKSet(new URL(jwksUrl)), {
     issuer, audience: clientId, algorithms: ["RS256"]
   });
   if (typeof verified.payload.nonce !== "string" || !equal(verified.payload.nonce, pending.nonce)) {
-    return res.status(401).send("Identity token nonce mismatch");
+    return res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).redirect(303, "/auth/error");
   }
   if (typeof verified.payload.email !== "string" || verified.payload.email_verified !== true) {
-    return res.status(401).send("A verified email address is required");
+    return res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).redirect(303, "/auth/error");
   }
   session.auth = true;
   session.email = verified.payload.email.toLowerCase();

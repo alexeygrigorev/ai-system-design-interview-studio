@@ -63,3 +63,23 @@ test("OIDC login uses PKCE and creates a local session after a verified callback
   }
 });
 
+test("invalid OIDC state redirects to a clean error URL", async () => {
+  process.env.AUTH_BASE_URL = "https://auth.example.test";
+  process.env.AUTH_CLIENT_ID = "studio-client";
+  process.env.AUTH_ISSUER = "https://issuer.example.test/pool";
+  process.env.AUTH_JWKS_URL = "https://issuer.example.test/jwks";
+  process.env.AUTH_CALLBACK_URL = "https://studio.example.test/auth/callback";
+  const { createApp } = await import("./app.js");
+  const server = createServer(createApp(process.cwd()));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    assert(address && typeof address !== "string");
+    const response = await fetch(`http://127.0.0.1:${address.port}/auth/callback?code=secret&state=secret`, { redirect: "manual" });
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get("location"), "/auth/error");
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

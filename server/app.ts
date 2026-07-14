@@ -15,6 +15,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET ?? "dev-insecure-secret-change
 const PUBLIC_PATHS = new Set([
   "/login",
   "/auth/callback",
+  "/auth/error",
   "/api/health",
   "/favicon.ico",
   "/manifest.webmanifest",
@@ -261,6 +262,7 @@ function errorResponse(error: unknown, fallback: string) {
  *  live — the repo root in dev, /var/task (LAMBDA_TASK_ROOT) on Lambda. */
 export function createApp(projectRoot: string) {
   const app = express();
+  app.set("trust proxy", 1);
   app.use(express.urlencoded({ extended: false }));
   app.use(express.json({ limit: "4mb" }));
   app.use(
@@ -288,6 +290,17 @@ export function createApp(projectRoot: string) {
     res.redirect(303, "/login?bad=1");
   });
   app.get("/auth/callback", finishOidcLogin);
+  app.get("/auth/error", (_req, res) => {
+    res.status(403)
+      .set({
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
+      })
+      .type("html")
+      .send("<!doctype html><html><head><meta charset=utf-8><title>Sign-in error · Studio</title><style>body{font:16px system-ui;max-width:32rem;margin:10vh auto;padding:2rem}</style></head><body><h1>Sign-in error</h1><p>Authentication could not be completed.</p><a href=/login>Try again</a></body></html>");
+  });
   app.get("/logout", (req, res) => {
     req.session = null;
     res.redirect(303, oidcLogoutUrl());
