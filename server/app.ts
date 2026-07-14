@@ -4,6 +4,7 @@ import cookieSession from "cookie-session";
 import { buildDiagramPromptContext } from "./diagramContext.js";
 import { buildSystemPrompt, type SessionConfig } from "./promptPack.js";
 import { callZai, streamZai, type ChatMessage } from "./zaiClient.js";
+import { beginOidcLogin, finishOidcLogin, oidcConfigured, oidcLogoutUrl } from "./oidcAuth.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -13,6 +14,7 @@ const PASSPHRASE = process.env.STUDIO_PASSPHRASE ?? "aislgym";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "dev-insecure-secret-change-me";
 const PUBLIC_PATHS = new Set([
   "/login",
+  "/auth/callback",
   "/api/health",
   "/favicon.ico",
   "/manifest.webmanifest",
@@ -274,6 +276,7 @@ export function createApp(projectRoot: string) {
 
   app.get("/login", (req, res) => {
     if (req.session?.auth) return res.redirect(303, "/");
+    if (oidcConfigured()) return beginOidcLogin(req, res);
     res.type("html").send(loginPage(String(req.query.bad ?? "") === "1"));
   });
   app.post("/login", (req, res) => {
@@ -284,9 +287,10 @@ export function createApp(projectRoot: string) {
     }
     res.redirect(303, "/login?bad=1");
   });
+  app.get("/auth/callback", finishOidcLogin);
   app.get("/logout", (req, res) => {
     req.session = null;
-    res.redirect(303, "/login");
+    res.redirect(303, oidcLogoutUrl());
   });
 
   // Everything below requires the session cookie.

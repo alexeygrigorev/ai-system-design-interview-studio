@@ -47,6 +47,18 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret used to sign session cookies (keep stable across deploys)
+  AuthBaseUrl:
+    Type: String
+    Default: https://auth.dtcdev.click
+  AuthClientId:
+    Type: String
+    Description: Cognito app client ID for AI System Design Studio
+  AuthIssuer:
+    Type: String
+    Description: Cognito user-pool issuer URL
+  AuthJwksUrl:
+    Type: String
+    Description: Cognito user-pool JWKS URL
 
 Resources:
   LambdaRole:
@@ -84,6 +96,12 @@ Resources:
           ZAI_BASE_URL: !Ref ZaiBaseUrl
           STUDIO_PASSPHRASE: !Ref Passphrase
           SESSION_SECRET: !Ref SessionSecret
+          AUTH_BASE_URL: !Ref AuthBaseUrl
+          AUTH_CLIENT_ID: !Ref AuthClientId
+          AUTH_CALLBACK_URL: !Sub "https://${DomainName}/auth/callback"
+          AUTH_LOGOUT_URL: !Sub "https://${DomainName}/"
+          AUTH_ISSUER: !Ref AuthIssuer
+          AUTH_JWKS_URL: !Ref AuthJwksUrl
           # Lambda Web Adapter: run the Express app as a long-lived HTTP server
           # and serve it behind the API Gateway (buffered). A streaming Function
           # URL is not used — the account's SCP blocks public lambda:InvokeFunctionUrl.

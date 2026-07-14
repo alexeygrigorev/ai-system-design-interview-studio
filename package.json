@@ -8,12 +8,14 @@
     "build": "tsc -b && vite build",
     "build:lambda": "esbuild lambda/server.ts --bundle --platform=node --format=cjs --target=node22 --outfile=build/lambda/server.cjs --define:process.env.NODE_ENV='\"production\"'",
     "preview": "NODE_ENV=production node dist-server/index.js",
+    "test": "node --import tsx --test server/*.test.ts",
     "typecheck": "tsc -b"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.1",
     "cookie-session": "^2.1.0",
     "express": "^5.2.1",
+    "jose": "^6.2.3",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

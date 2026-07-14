@@ -18,6 +18,14 @@ fi
 # Stable across deploys when provided by CI (secrets.STUDIO_SESSION_SECRET);
 # otherwise generated per-run (sessions reset each deploy).
 SESSION_SECRET="${SESSION_SECRET:-$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")}"
+AUTH_STACK="${AUTH_STACK:-dtcdev-shared-auth}"
+auth_output() {
+  aws cloudformation describe-stacks --region us-east-1 --stack-name "$AUTH_STACK" \
+    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text
+}
+AUTH_CLIENT_ID="${AUTH_CLIENT_ID:-$(auth_output SystemDesignStudioClientId)}"
+AUTH_ISSUER="${AUTH_ISSUER:-$(auth_output IssuerUrl)}"
+AUTH_JWKS_URL="${AUTH_JWKS_URL:-$(auth_output JwksUrl)}"
 
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 BUCKET="ai-sds-deploy-${ACCOUNT}-${REGION}"
@@ -63,7 +71,8 @@ aws cloudformation deploy --region "$REGION" --stack-name "$STACK" \
     CodeBucket="$BUCKET" CodeKey="$KEY" \
     DomainName="$DOMAIN" HostedZoneId="$ZONE" \
     ZaiApiKey="$ZAI_API_KEY" \
-    Passphrase="$PASSPHRASE" SessionSecret="$SESSION_SECRET"
+    Passphrase="$PASSPHRASE" SessionSecret="$SESSION_SECRET" \
+    AuthClientId="$AUTH_CLIENT_ID" AuthIssuer="$AUTH_ISSUER" AuthJwksUrl="$AUTH_JWKS_URL"
 
 echo "==> outputs"
 aws cloudformation describe-stacks --region "$REGION" --stack-name "$STACK" \
